@@ -1,0 +1,36 @@
+{
+    "name": "zk-identity-verification",
+    "version": "1.0.0",
+    "description": "Decentralized identity verification using Zero-Knowledge Proofs",
+    "scripts": {
+        "compile:circuits": "node scripts/compile-circuits.js",
+        "deploy:local": "hardhat run scripts/deploy.js --network localhost",
+        "deploy:testnet": "hardhat run scripts/deploy.js --network sepolia",
+        "deploy:amoy": "hardhat run scripts/deploy.js --network amoy",
+        "test:contracts": "hardhat test",
+        "chain": "hardhat node",
+        "dev": "cd frontend && npm run dev",
+        "build": "cd frontend && npm run build"
+    },
+    "keywords": [
+        "zero-knowledge",
+        "zk-snarks",
+        "identity",
+        "blockchain",
+        "privacy"
+    ],
+    "author": "",
+    "license": "MIT",
+    "devDependencies": {
+        "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+        "chai": "^4.3.10",
+        "circom": "^0.5.46",
+        "hardhat": "^2.19.5"
+    },
+    "dependencies": {
+        "circomlib": "^2.0.5",
+        "dotenv": "^17.2.3",
+        "ethers": "^6.10.0",
+        "snarkjs": "^0.7.3"
+    }
+}
