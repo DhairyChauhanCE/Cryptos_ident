@@ -6,52 +6,70 @@ const IDENTITY_REGISTRY_ADDRESS = import.meta.env.VITE_IDENTITY_REGISTRY;
 const IdentityRegistryABI = IdentityRegistryArtifact.abi;
 
 /**
- * Identity Service
- * Centralized logic with Environment Lockdown (Phase 7).
+ * Network Assertion (Phase 12 Protection)
+ * Prevents execution if the user is on the wrong blockchain.
  */
-
-export const getRegistryContract = async (signerOrProvider) => {
-    // Security Guard: Enforce correct network
-    // Signers in v6 don't have getNetwork, but their providers do
-    const provider = signerOrProvider.provider || signerOrProvider;
-    const network = await provider.getNetwork();
-
-    if (!EXPECTED_CHAIN_ID) {
-        throw new Error("SECURITY_ALERT: VITE_CHAIN_ID is not defined in environment.");
+export async function assertNetwork(provider) {
+    const net = await provider.getNetwork();
+    if (Number(net.chainId) !== Number(EXPECTED_CHAIN_ID)) {
+        throw new Error(`SECURITY_ALERT: Wrong network connected. Expected ${EXPECTED_CHAIN_ID}, found ${net.chainId}.`);
     }
+}
 
-    if (network.chainId.toString() !== EXPECTED_CHAIN_ID.toString()) {
-        throw new Error(`SECURITY_ALERT: Incorrect network detected. Expected Chain ID ${EXPECTED_CHAIN_ID}, found ${network.chainId}.`);
-    }
+/**
+ * Unified Identity Registry Entry Point
+ * @param {boolean} readonly If true, returns a contract for viewing only
+ */
+export async function getRegistryContract(readonly = true) {
+    if (!window.ethereum) throw new Error("NO_ETHEREUM_PROVIDER");
+
+    const provider = new ethers.BrowserProvider(window.ethereum);
+    await assertNetwork(provider);
+
+    const signerOrProvider = readonly ? provider : await provider.getSigner();
 
     return new ethers.Contract(
         IDENTITY_REGISTRY_ADDRESS,
         IdentityRegistryABI,
         signerOrProvider
     );
-};
+}
 
+/**
+ * Fetches comprehensive verification status, including Revocation checks.
+ */
 export const getIdentityVerificationStatus = async (address) => {
     if (!address) return null;
 
-    const provider = new ethers.BrowserProvider(window.ethereum);
-    // Note: getRegistryContract now includes the chain ID check
-    const registry = await getRegistryContract(provider);
+    // Use unified entry point (readonly)
+    const registry = await getRegistryContract(true);
 
     try {
-        const [isRegistered, isAgeVerified, isNatVerified, isStuVerified] = await Promise.all([
+        const [isRegistered, acts] = await Promise.all([
             registry.isRegistered(address),
-            registry.isAgeVerified(address),
-            registry.isNationalityVerified(address),
-            registry.isStudentVerified(address)
+            Promise.all([
+                registry.isAgeVerified(address),
+                registry.isNationalityVerified(address),
+                registry.isStudentVerified(address),
+                registry.isRevoked(address, 0), // AGE_OVER_18
+                registry.isRevoked(address, 1), // NATIONALITY_MATCH
+                registry.isRevoked(address, 2)  // UNIVERSITY_STUDENT
+            ])
         ]);
+
+        const [isAge, isNat, isStu, revAge, revNat, revStu] = acts;
 
         return {
             registered: isRegistered,
-            age: isAgeVerified,
-            nationality: isNatVerified,
-            student: isStuVerified,
-            fullyVerified: isAgeVerified && isNatVerified && isStuVerified
+            age: isAge && !revAge,
+            nationality: isNat && !revNat,
+            student: isStu && !revStu,
+            revoked: {
+                age: revAge,
+                nationality: revNat,
+                student: revStu
+            },
+            fullyVerified: (isAge && !revAge) && (isNat && !revNat) && (isStu && !revStu)
         };
     } catch (error) {
         console.error("SERVICE_ERROR: Status fetch failed", error);
@@ -59,12 +77,14 @@ export const getIdentityVerificationStatus = async (address) => {
     }
 };
 
+/**
+ * Administrative Registration
+ */
 export const registerIdentityOnChain = async (did) => {
-    const provider = new ethers.BrowserProvider(window.ethereum);
-    const signer = await provider.getSigner();
-    const registry = await getRegistryContract(signer);
-
+    // Use unified entry point (signer required)
+    const registry = await getRegistryContract(false);
     const tx = await registry.registerIdentity(did);
     await tx.wait();
     return tx.hash;
 };
+bitumen

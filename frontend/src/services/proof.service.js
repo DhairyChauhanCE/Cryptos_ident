@@ -1,10 +1,10 @@
 import * as snarkjs from 'snarkjs';
 import { getRegistryContract } from './identity.service';
-import { ethers } from 'ethers';
 
 /**
  * Proof Service
  * Centralized logic for ZK proof generation and submission to Ethereum.
+ * Integrated with Unified Registry Access (Phase 12).
  */
 
 const formatCalldata = (proof, publicSignals) => {
@@ -50,10 +50,8 @@ export const proveOnChain = async (type, inputs) => {
         zkeyPath
     );
 
-    // 2. Submit Transaction
-    const provider = new ethers.BrowserProvider(window.ethereum);
-    const signer = await provider.getSigner();
-    const registry = await getRegistryContract(signer);
+    // 2. Submit Transaction using Unified Signer
+    const registry = await getRegistryContract(false);
 
     const callData = formatCalldata(proof, publicSignals);
     const tx = await registry[methodName](callData.a, callData.b, callData.c, callData.input);
@@ -61,3 +59,4 @@ export const proveOnChain = async (type, inputs) => {
 
     return tx.hash;
 };
+bitumen

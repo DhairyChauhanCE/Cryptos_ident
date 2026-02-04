@@ -192,10 +192,15 @@ function App() {
                                                     )}
                                                 </div>
                                             ) : (
-                                                <div className="glass-card">
+                                                <div className="glass-card" style={{ border: identityState === 'revoked' ? '1px solid var(--accent-red)' : '' }}>
                                                     <div className="profile-card">
-                                                        <h2 className="mono" style={{ fontSize: '1rem', color: 'var(--accent-mint)', marginBottom: '1.5rem', letterSpacing: '0.3em' }}>
-                                                            DIGITAL_PASSPORT_v1.0
+                                                        <h2 className="mono" style={{
+                                                            fontSize: '1rem',
+                                                            color: identityState === 'revoked' ? 'var(--accent-red)' : 'var(--accent-mint)',
+                                                            marginBottom: '1.5rem',
+                                                            letterSpacing: '0.3em'
+                                                        }}>
+                                                            {identityState === 'revoked' ? 'SURVEILLANCE_NOTICE: REVOKED' : 'DIGITAL_PASSPORT_v1.0'}
                                                         </h2>
                                                         <div className="profile-field">
                                                             <span className="profile-label">SUBJECT_IDENTIFIER (DID)</span>
@@ -212,13 +217,28 @@ function App() {
                                                             <div className="profile-value">NAT_{localIdentity.nationality}</div>
                                                         </div>
 
-                                                        <div className="clearance-badge">
-                                                            CLEARANCE: {identityState === 'verified' ? 'AUTHORIZED' : 'RESTRICTED'}
+                                                        <div className={`clearance-badge ${identityState === 'revoked' ? 'revoked' : ''}`} style={{
+                                                            borderColor: identityState === 'revoked' ? 'var(--accent-red)' : 'var(--accent-mint)',
+                                                            color: identityState === 'revoked' ? 'var(--accent-red)' : 'var(--accent-mint)',
+                                                            background: identityState === 'revoked' ? 'rgba(255, 51, 102, 0.1)' : 'rgba(0, 255, 153, 0.1)'
+                                                        }}>
+                                                            CLEARANCE: {identityState === 'revoked' ? 'REVOKED' : (identityState === 'verified' ? 'AUTHORIZED' : 'RESTRICTED')}
                                                         </div>
+
+                                                        {identityState === 'revoked' && (
+                                                            <div className="mono" style={{ color: 'var(--accent-red)', fontSize: '0.6rem', marginTop: '1rem', lineHeight: '1.4' }}>
+                                                                CRITICAL_EXCEPTION: This identity has been revoked by the system administrator. All trading and verification privileges are suspended.
+                                                            </div>
+                                                        )}
 
                                                         <div style={{ marginTop: '2rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                                                             {!chainIdentity?.registered && (
-                                                                <button className="btn-primary" disabled={isRegistering} onClick={handleRegisterOnChain} style={{ fontSize: '0.7rem', padding: '0.5rem 1rem' }}>
+                                                                <button
+                                                                    className="btn-primary"
+                                                                    disabled={isRegistering || identityState === 'revoked'}
+                                                                    onClick={handleRegisterOnChain}
+                                                                    style={{ fontSize: '0.7rem', padding: '0.5rem 1rem' }}
+                                                                >
                                                                     {isRegistering ? 'REGISTERING...' : 'INITIALIZE ON-CHAIN DID'}
                                                                 </button>
                                                             )}
@@ -300,3 +320,4 @@ function App() {
 }
 
 export default App;
+bitumen

@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react';
 import { getIdentityVerificationStatus, getRegistryContract } from '../services/identity.service';
-import { ethers } from 'ethers';
 
 /**
  * useIdentity Hook
  * Implements a State Machine for Identity Status based on On-Chain Data.
+ * Integrated Revocation Awareness (Phase 12).
  */
-
 export function useIdentity(address) {
     const [status, setStatus] = useState({
         state: 'loading',
@@ -23,13 +22,20 @@ export function useIdentity(address) {
             if (data.fullyVerified) state = 'verified';
             else if (data.age || data.nationality || data.student) state = 'partially_verified';
 
+            // Critical Revocation Check
+            const isAnyRevoked = Object.values(data.revoked || {}).some(v => v === true);
+            if (isAnyRevoked) state = 'revoked';
+
             setStatus({
                 state,
                 details: data
             });
         } catch (error) {
             console.error("HOOK_ERROR: Status refresh failed", error);
-            setStatus(prev => ({ ...prev, state: 'error' }));
+            // Don't show error if it's just a network mismatch (service handles that alert)
+            if (!error.message.includes("SECURITY_ALERT")) {
+                setStatus(prev => ({ ...prev, state: 'error' }));
+            }
         }
     };
 
@@ -39,8 +45,8 @@ export function useIdentity(address) {
 
             const setupListeners = async () => {
                 try {
-                    const provider = new ethers.BrowserProvider(window.ethereum);
-                    const registry = await getRegistryContract(provider);
+                    // Use readonly registry for event listening
+                    const registry = await getRegistryContract(true);
 
                     const onUpdate = (user) => {
                         if (user.toLowerCase() === address.toLowerCase()) {
@@ -73,3 +79,4 @@ export function useIdentity(address) {
 
     return { ...status, refresh: refreshStatus };
 }
+bitumen
