@@ -1,63 +1,41 @@
+pragma circom 2.0.0;
+
+include "../node_modules/circomlib/circuits/poseidon.circom";
+include "../node_modules/circomlib/circuits/comparators.circom";
+
 template AgeVerification() {
-    // Private inputs (explicitly marked private for circom 0.5 compatibility)
-    signal private input dob;           // Date of birth (YYYYMMDD)
-    signal private input currentDate;   // Current date (YYYYMMDD)
-    signal private input salt;          // Unique salt for privacy
+    // Private identity data
+    signal input dob;           // YYYYMMDD
+    signal input nationality;   // ISO Numeric
+    signal input studentId;     // Hashed or numeric ID
+    signal input userSalt;      // Privacy salt
     
-    // Public inputs (non-private inputs are public in 0.5/snarkjs by default)
-    signal input minAge;        // Minimum age requirement (e.g., 18)
-    signal input nonce;         // Replay protection nonce
+    // Public inputs
+    signal input identityHash;  // Poseidon(dob, nationality, studentId, userSalt)
+    signal input currentDate;   // YYYYMMDD
+    signal input minAge;        // Requirement (e.g. 18)
+    signal input nonce;         // Replay protection
     
-    // Higher Precision Logic: YYYYMMDD
-    // Example: CurrentDate = 20240202, 
-    // Threshold = 20240202 - 180000 = 20060202
-    // If Threshold (20060202) >= dob (20060201) -> person is 18+
+    // 1. Verify Commitment
+    component hasher = Poseidon(4);
+    hasher.inputs[0] <== dob;
+    hasher.inputs[1] <== nationality;
+    hasher.inputs[2] <== studentId;
+    hasher.inputs[3] <== userSalt;
     
-    component ageGeq = GreaterEqThan(32);
-    ageGeq.in[0] <== currentDate - 180000;
-    ageGeq.in[1] <== dob;
+    hasher.out === identityHash;
     
-    ageGeq.out === 1;
+    // 2. Verify Age Logic
+    // Threshold = currentDate - (minAge * 10000)
+    // If currentDate = 20240202 and minAge = 18, Threshold = 20060202
+    // dob must be <= Threshold
+    
+    component ageCheck = LessEqThan(32);
+    ageCheck.in[0] <== dob;
+    ageCheck.in[1] <== currentDate - (minAge * 10000);
+    
+    ageCheck.out === 1;
 }
 
-// Corrected GreaterEqThan: out = 1 if in[0] >= in[1], else 0
-template GreaterEqThan(n) {
-    signal input in[2];
-    signal output out;
-    
-    component lt = LessThan(n);
-    lt.in[0] <== in[0];
-    lt.in[1] <== in[1];
-    
-    out <== 1 - lt.out;
-}
+component main {public [currentDate, identityHash, minAge, nonce]} = AgeVerification();
 
-// LessThan template from circomlib
-template LessThan(n) {
-    assert(n <= 252);
-    signal input in[2];
-    signal output out;
-
-    component n2b = Num2Bits(n+1);
-    n2b.in <== in[0] + (1<<n) - in[1];
-
-    out <== 1-n2b.out[n];
-}
-
-template Num2Bits(n) {
-    signal input in;
-    signal output out[n];
-    var lc1=0;
-
-    var e2=1;
-    for (var i = 0; i<n; i++) {
-        out[i] <-- (in >> i) & 1;
-        out[i] * (out[i] -1 ) === 0;
-        lc1 += out[i] * e2;
-        e2 = e2+e2;
-    }
-
-    lc1 === in;
-}
-
-component main = AgeVerification();

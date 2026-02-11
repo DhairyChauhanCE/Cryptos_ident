@@ -1,118 +1,302 @@
-import React from 'react';
-import { motion } from 'framer-motion';
-import { Shield, Eye, Lock, Globe, MoveRight } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion';
+import { MoveRight, Plus, Twitter, Github, MessageSquare, Shield, Cpu, Zap, Database, Globe, Layers } from 'lucide-react';
 
-const LandingPage = ({ onEnter }) => {
-    const containerVariants = {
-        hidden: { opacity: 0 },
-        visible: {
-            opacity: 1,
-            transition: { staggerChildren: 0.3, delayChildren: 0.2 }
-        }
+const MatrixLine = ({ text }) => {
+    const [displayed, setDisplayed] = useState('');
+    useEffect(() => {
+        let i = 0;
+        const interval = setInterval(() => {
+            setDisplayed(text.slice(0, i));
+            i++;
+            if (i > text.length) clearInterval(interval);
+        }, 30);
+        return () => clearInterval(interval);
+    }, [text]);
+
+    return <div className="matrix-line">{displayed}<span className="cursor-blink">_</span></div>;
+};
+
+const LandingPage = ({ onEnter, isConnected, address }) => {
+    const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+
+    useEffect(() => {
+        const handleMouseMove = (e) => {
+            setMousePosition({ x: e.clientX, y: e.clientY });
+        };
+        window.addEventListener('mousemove', handleMouseMove);
+        return () => window.removeEventListener('mousemove', handleMouseMove);
+    }, []);
+
+    const [matrixData, setMatrixData] = useState([]);
+    useEffect(() => {
+        const lines = [
+            "INITIALIZING_ZK_PROVER_V3...",
+            "NODE_CONNECTED: 0x72a...f91",
+            "VERIFYING_AGE_PROOF_COMPLIANCE...",
+            "SECURE_ENCLAVE: ACTIVE",
+            "BITCOIN_L0_BRIDGE: SYNCHRONIZED",
+            "GAS_OPTIMIZATION: 98.4%",
+            "ENTROPY_COLLECTED: VALID",
+            "IDENTITY_VAULT_ENCRYPTED: TRUE"
+        ];
+        const interval = setInterval(() => {
+            setMatrixData(prev => [...prev.slice(-15), lines[Math.floor(Math.random() * lines.length)] + " [" + Math.random().toString(16).slice(2, 8) + "]"]);
+        }, 150);
+        return () => clearInterval(interval);
+    }, []);
+
+    const { scrollYProgress } = useScroll();
+    const heroOpacity = useTransform(scrollYProgress, [0, 0.2], [1, 0]);
+    const heroScale = useTransform(scrollYProgress, [0, 0.2], [1, 0.9]);
+
+    const sidebarVariants = {
+        hidden: { opacity: 0, x: -50 },
+        visible: { opacity: 1, x: 0, transition: { duration: 1, ease: "easeOut" } }
     };
 
-    const itemVariants = {
-        hidden: { y: 20, opacity: 0 },
-        visible: {
-            y: 0,
-            opacity: 1,
-            transition: { duration: 0.8, ease: [0.16, 1, 0.3, 1] }
-        }
-    };
-
-    const glowVariants = {
-        initial: { scale: 0.8, opacity: 0.3 },
-        animate: {
-            scale: 1,
-            opacity: 0.6,
-            transition: { duration: 4, repeat: Infinity, repeatType: "reverse", ease: "easeInOut" }
-        }
+    const rightSidebarVariants = {
+        hidden: { opacity: 0, x: 50 },
+        visible: { opacity: 1, x: 0, transition: { duration: 1, ease: "easeOut" } }
     };
 
     return (
-        <div className="landing-container">
-            {/* Cinematic Background Elements */}
-            <motion.div
-                className="radial-glow top-right"
-                variants={glowVariants}
-                initial="initial"
-                animate="animate"
-            />
-            <motion.div
-                className="radial-glow bottom-left"
-                variants={glowVariants}
-                initial="initial"
-                animate="animate"
-                style={{ animationDelay: '2s' }}
-            />
+        <div className="mvc-landing">
+            {/* Top Navigation */}
+            <nav className="mvc-nav">
+                <div className="nav-logo">MVC_LOGO</div>
+                <div className="nav-links">
+                    <a href="#">Learn</a>
+                    <a href="#">Solution</a>
+                    <a href="#">Build</a>
+                    <a href="#">Space</a>
+                    <a href="#">Ecosystem</a>
+                    <a href="#">DAO</a>
+                    <a href="#">Bridge</a>
+                </div>
+                <button className="join-community-btn">Join the Community</button>
+            </nav>
 
-            <motion.main
-                className="hero-section"
-                variants={containerVariants}
-                initial="hidden"
-                animate="visible"
-            >
-                <motion.div className="eyebrow" variants={itemVariants}>
-                    <span className="badge">v1.2 // ATOMIC_PRIVACY_PROTOCOL</span>
+            <div className="mvc-main-layout">
+                {/* Left Sidebar */}
+                <motion.div
+                    className="mvc-side-left"
+                    variants={sidebarVariants}
+                    initial="hidden"
+                    animate="visible"
+                >
+                    <div className="feature-list">
+                        <div className="feature-item"><Plus size={14} /> Bitcoin</div>
+                        <div className="feature-item"><Plus size={14} /> Smart Contract</div>
+                        <div className="feature-item"><Plus size={14} /> Scalability</div>
+                        <div className="feature-item"><Plus size={14} /> Decentralized ID</div>
+                    </div>
+
+                    <div className="mvc-join-us">
+                        <h4>Join Us</h4>
+                        <div className="social-links">
+                            <a href="#" target="_blank" rel="noopener noreferrer"><MessageSquare size={16} /> Discord</a>
+                            <a href="#" target="_blank" rel="noopener noreferrer"><Twitter size={16} /> Twitter</a>
+                            <a href="https://github.com/chauhand2463" target="_blank" rel="noopener noreferrer"><Github size={16} /> GitHub</a>
+                        </div>
+                    </div>
                 </motion.div>
 
-                <motion.h1 className="hero-title" variants={itemVariants}>
-                    OWN YOUR <span className="highlight">IDENTITY</span><br />
-                    REVEAL <span className="highlight-gold">NOTHING.</span>
-                </motion.h1>
+                {/* Central Hero */}
+                <motion.div
+                    className="mvc-hero"
+                    style={{ opacity: heroOpacity, scale: heroScale }}
+                >
+                    <motion.div
+                        className="mvc-badge"
+                        initial={{ opacity: 0, y: -20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                    >
+                        MicroVisionChain
+                    </motion.div>
 
-                <motion.p className="hero-subtitle" variants={itemVariants}>
-                    The world's most beautiful decentralized identity system.
-                    Powered by Zero-Knowledge Proofs on Ethereum.
-                    Private by design. Gorgeous by choice.
-                </motion.p>
+                    <h1 className="mvc-title">
+                        THE BLOCKCHAIN <br />
+                        FOR <span className="highlight-purple">WEB3</span>
+                    </h1>
 
-                <motion.div className="hero-actions" variants={itemVariants}>
+                    {/* Central Eye Particle Graphic */}
+                    <div className="eye-container">
+                        <div className="eye-outer">
+                            <motion.div
+                                className="eye-particle-ring"
+                                animate={{ rotate: 360 }}
+                                transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+                            />
+                            <div className="eye-core">
+                                <div className="pupil" />
+                            </div>
+                        </div>
+                    </div>
+
                     <motion.button
-                        className="btn-primary main-cta"
+                        className="mvc-cta"
                         onClick={onEnter}
                         whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
                     >
-                        INITIALIZE PROTOCOL <MoveRight size={18} style={{ marginLeft: '10px' }} />
+                        {isConnected ? 'ACCESS DASHBOARD' : 'INITIALIZE PROTOCOL'}
+                        <MoveRight size={20} />
                     </motion.button>
+                </motion.div>
 
-                    <div className="stat-row">
-                        <div className="stat-item">
-                            <span className="stat-value">100%</span>
-                            <span className="stat-label">LOCAL_DATA</span>
+                {/* Right Sidebar */}
+                <motion.div
+                    className="mvc-side-right"
+                    variants={rightSidebarVariants}
+                    initial="hidden"
+                    animate="visible"
+                >
+                    <div className="orbital-group">
+                        <div className="orbital-item">
+                            <div className="planet bitcoin">B</div>
+                            <span>Scaling Bitcoin</span>
                         </div>
-                        <div className="divider"></div>
-                        <div className="stat-item">
-                            <span className="stat-value">ZK-SNARK</span>
-                            <span className="stat-label">PROOF_ENGINE</span>
+                        <div className="orbital-item">
+                            <div className="planet explore" />
+                            <span>Onboard Web3</span>
+                        </div>
+                        <div className="orbital-item">
+                            <div className="planet build" />
+                            <span>Build Together</span>
                         </div>
                     </div>
                 </motion.div>
+            </div>
 
-                <motion.div className="feature-grid" variants={itemVariants}>
-                    <div className="feature-card">
-                        <Shield className="feature-icon" size={24} />
-                        <h3>Privacy First</h3>
-                        <p>Your data never leaves your device. Only cryptographic proofs reach the chain.</p>
-                    </div>
-                    <div className="feature-card">
-                        <Lock className="feature-icon" size={24} />
-                        <h3>Groth16 ZKP</h3>
-                        <p>Advanced zero-knowledge tech ensures mathematical verification of claims.</p>
-                    </div>
-                    <div className="feature-card">
-                        <Globe className="feature-icon" size={24} />
-                        <h3>Multichain DID</h3>
-                        <p>Decentralized identity linked to your wallet, verified on the ZK ledger.</p>
-                    </div>
-                </motion.div>
-            </motion.main>
+            {/* NEW EXTREME SECTIONS */}
+            <div className="mvc-landing-expanded">
+                {/* Tech Core Section */}
+                <section className="landing-section">
+                    <span className="section-tag">01 // THE_CORE</span>
+                    <h2 className="section-title">ADVANCED_ZK <br /> TECHNOLOGY</h2>
 
-            <footer className="landing-footer">
-                <div className="mono">ENCRYPTED_HANDSHAKE_PENDING...</div>
-                <div className="mono">TRUSTLESS_VERIFICATION_LAYER_V1</div>
-            </footer>
+                    <div className="tech-core-grid">
+                        {[
+                            { title: 'HYPER_SCALING', desc: 'Unlimited transaction throughput via ZK-Rollups on Bitcoin.', icon: <Zap /> },
+                            { title: 'IDENTITY_VAULT', desc: 'Self-sovereign identity with recursive zero-knowledge proofs.', icon: <Shield /> },
+                            { title: 'BITCOIN_L0', desc: 'Native bridging and asset security inherited from Layer 0.', icon: <Database /> },
+                            { title: 'GLOBAL_ENCLAVE', desc: 'A decentralized network of secure verification nodes.', icon: <Globe /> }
+                        ].map((tech, i) => (
+                            <motion.div
+                                key={i}
+                                className="tech-card interactive-glass"
+                                initial={{ opacity: 0, y: 30, scale: 0.95 }}
+                                whileInView={{ opacity: 1, y: 0, scale: 1 }}
+                                viewport={{ once: true, margin: "-50px" }}
+                                transition={{
+                                    delay: i * 0.15,
+                                    duration: 0.8,
+                                    ease: [0.16, 1, 0.3, 1]
+                                }}
+                                whileHover={{ y: -10 }}
+                            >
+                                <div className="tech-icon-large">{tech.icon}</div>
+                                <h3 className="mono" style={{ color: 'var(--accent-primary)', marginBottom: '1rem' }}>{tech.title}</h3>
+                                <p style={{ fontSize: '0.9rem', color: 'var(--text-dim)', lineHeight: '1.6' }}>{tech.desc}</p>
+                                <div className="card-glow-fx" />
+                            </motion.div>
+                        ))}
+                    </div>
+                </section>
+
+                {/* Matrix Scrolling Section */}
+                <div className="matrix-container">
+                    <div className="matrix-feed">
+                        <AnimatePresence>
+                            {matrixData.map((line, i) => (
+                                <motion.div
+                                    key={i}
+                                    initial={{ opacity: 0, x: -10 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    exit={{ opacity: 0 }}
+                                    transition={{ duration: 0.5 }}
+                                >
+                                    <MatrixLine text={line} />
+                                </motion.div>
+                            ))}
+                        </AnimatePresence>
+                    </div>
+                    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'radial-gradient(circle, transparent 20%, #000 80%)' }}>
+                        <div className="glass-card" style={{ textAlign: 'center', padding: '3rem' }}>
+                            <Cpu size={40} color="var(--accent-primary)" style={{ marginBottom: '1rem' }} />
+                            <h2 className="view-header">ATOMIC_EXECUTION</h2>
+                            <p className="mono" style={{ fontSize: '0.7rem' }}>LIVE_NETWORK_THROUGHPUT: 50k+ TPS</p>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Architecture Deep-Dive */}
+                <section className="landing-section" style={{ background: 'rgba(90, 90, 254, 0.02)' }}>
+                    <span className="section-tag">02 // ARCHITECTURE</span>
+                    <h2 className="section-title" style={{ textAlign: 'center' }}>SYSTEM_STACK</h2>
+
+                    <div className="arch-visual">
+                        {[
+                            { name: 'APPLICATION_LAYER', sub: 'dApps, Wallet, DEX', color: 'var(--accent-secondary)' },
+                            { name: 'ZK_IDENTITY_VAULT', sub: 'Cryptography Enclave', color: 'var(--accent-primary)' },
+                            { name: 'MVC_PROTOCOL', sub: 'Decentralized Smart Contracts', color: 'var(--accent-primary)' },
+                            { name: 'BITCOIN_SETTLEMENT', sub: 'Layer 0 Security', color: 'var(--text-dim)' }
+                        ].map((layer, i) => (
+                            <React.Fragment key={i}>
+                                <motion.div
+                                    className="arch-layer"
+                                    initial={{ opacity: 0, scale: 0.9 }}
+                                    whileInView={{ opacity: 1, scale: 1 }}
+                                    viewport={{ once: true }}
+                                    style={{ borderColor: layer.color }}
+                                >
+                                    <h3 className="mono" style={{ color: layer.color }}>{layer.name}</h3>
+                                    <p style={{ fontSize: '0.7rem', opacity: 0.6 }}>{layer.sub}</p>
+                                </motion.div>
+                                {i < 3 && <div className="arch-connector" />}
+                            </React.Fragment>
+                        ))}
+                    </div>
+                </section>
+
+                {/* Footer Section */}
+                <footer className="landing-section" style={{ borderTop: 'var(--border-width) solid var(--border-dim)' }}>
+                    <div className="flex-between" style={{ alignItems: 'flex-start' }}>
+                        <div>
+                            <div className="nav-logo" style={{ marginBottom: '1rem' }}>MVC_LOGO</div>
+                            <p className="mono" style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>
+                                © 2026 MicroVisionChain. <br />
+                                SECURE_DECENTRALIZED_SCALABLE.
+                            </p>
+                        </div>
+                        <div style={{ display: 'flex', gap: '4rem' }}>
+                            <div className="mono" style={{ fontSize: '0.8rem' }}>
+                                <p style={{ color: 'var(--accent-primary)', marginBottom: '1rem' }}>RESOURCES</p>
+                                <a href="#" style={{ display: 'block', marginBottom: '0.5rem', transition: 'color 0.3s' }} className="hover-link">Whitepaper</a>
+                                <a href="#" style={{ display: 'block', marginBottom: '0.5rem', transition: 'color 0.3s' }} className="hover-link">Docs</a>
+                                <a href="https://github.com/chauhand2463" target="_blank" rel="noopener noreferrer" style={{ display: 'block', transition: 'color 0.3s' }} className="hover-link">GitHub</a>
+                            </div>
+                            <div className="mono" style={{ fontSize: '0.8rem' }}>
+                                <p style={{ color: 'var(--accent-primary)', marginBottom: '1rem' }}>ECOSYSTEM</p>
+                                <a href="#" style={{ display: 'block', marginBottom: '0.5rem', transition: 'color 0.3s' }} className="hover-link">DAO</a>
+                                <a href="#" style={{ display: 'block', marginBottom: '0.5rem', transition: 'color 0.3s' }} className="hover-link">Bridge</a>
+                                <a href="#" style={{ display: 'block', transition: 'color 0.3s' }} className="hover-link">Grants</a>
+                            </div>
+                        </div>
+                    </div>
+                </footer>
+            </div>
+
+            {/* Background Effects */}
+            <div className="mvc-bg-fx">
+                <div className="noise-overlay" />
+                <motion.div
+                    className="mouse-glow"
+                    style={{
+                        background: `radial-gradient(600px circle at ${mousePosition.x}px ${mousePosition.y}px, rgba(90, 90, 254, 0.08), transparent 40%)`
+                    }}
+                />
+            </div>
         </div>
     );
 };

@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ethers } from 'ethers';
 import { saveIdentity, generateSalt } from '../utils/identityStorage';
+import { calculateIdentityHash } from '../utils/zkUtils';
+import RegistryABI from '../contracts/IdentityRegistry.json';
+import Deployment from '../contracts/deployment.json';
 
 const IdentityCreation = ({ onIdentityCreated }) => {
     const [dob, setDob] = useState('');
@@ -22,30 +25,65 @@ const IdentityCreation = ({ onIdentityCreated }) => {
             const signature = await signer.signMessage(message);
             const encryptionKey = ethers.keccak256(ethers.toUtf8Bytes(signature));
 
-            // Format DOB: YYYY-MM-DD -> YYYYMMDD (Accuracy improvement)
-            const dobNumber = parseInt(dob.replace(/-/g, ''));
+            // Format DOB: YYYY-MM-DD -> YYYYMMDD
+            const dobNumber = dob.replace(/-/g, '');
 
-            // 2. Generate identity data
+            // 2. Generate identity data & cryptographic commitment
             const salt = generateSalt();
+            const commitment = await calculateIdentityHash(
+                dobNumber,
+                nationality,
+                studentId || '0',
+                salt
+            );
+
             const newIdentity = {
-                dob: dobNumber,
+                dob: parseInt(dobNumber),
                 nationality: parseInt(nationality),
                 university: parseInt(university),
                 studentId: parseInt(studentId) || 0,
                 salt,
+                identityHash: commitment,
                 ageVerified: false,
                 nationalityVerified: false,
                 studentVerified: false
             };
 
-            // 3. Store encrypted (utils handles sessionKey caching)
-            saveIdentity(newIdentity, encryptionKey);
+            // 3. Register on-chain (IdentityRegistry)
+            const registryContract = new ethers.Contract(
+                Deployment.contracts.IdentityRegistry,
+                RegistryABI.abi,
+                signer
+            );
 
-            // 4. Callback
-            onIdentityCreated(newIdentity, encryptionKey);
+            const tx = await registryContract.registerIdentity("0x" + BigInt(commitment).toString(16).padStart(64, '0'));
+            await tx.wait();
+
+            // 4. Store metadata in Backend (Phase 13 Integration)
+            try {
+                const address = await signer.getAddress();
+                const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
+                await fetch(`${backendUrl}/api/identities`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        address,
+                        identityHash: commitment,
+                        university: parseInt(university)
+                    })
+                });
+            } catch (err) {
+                console.warn("BACKEND_PERSISTENCE_FAILED: Stats will not be logged.", err);
+            }
+
+            // 5. Store encrypted locally (Phase 3: WebCrypto AES-GCM)
+            await saveIdentity(newIdentity, signature);
+
+            // 6. Callback
+            onIdentityCreated(newIdentity, signature);
         } catch (error) {
             console.error("Identity creation failed:", error);
-            alert("Security Error: Failed to initialize vault. Access denied.");
+            alert("Security Error: Failed to register identity or initialize vault.");
         } finally {
             setLoading(false);
         }
@@ -80,8 +118,8 @@ const IdentityCreation = ({ onIdentityCreated }) => {
                     onChange={(e) => setDob(e.target.value)}
                     required
                 />
-                <div style={{ fontSize: '0.65rem', color: 'var(--text-dim)', marginTop: '0.3rem', fontFamily: 'var(--font-mono)' }}>
-                    High-precision ZK verification enabled.
+                <div style={{ fontSize: '0.6rem', color: 'var(--text-dim)', marginTop: 'calc(var(--space-unit) / 2)', fontFamily: 'var(--font-mono)', opacity: 0.6 }}>
+                    SYSTEM_NOTICE: High-precision ZK verification enabled.
                 </div>
             </motion.div>
 
@@ -115,12 +153,12 @@ const IdentityCreation = ({ onIdentityCreated }) => {
                 </select>
             </motion.div>
 
-            <motion.div className="input-group" style={{ marginBottom: '2rem' }} variants={itemVariants}>
+            <motion.div className="input-group" variants={itemVariants}>
                 <span className="input-label">STUDENT_ID (PRIVATE)</span>
                 <input
                     type="number"
                     className="input-field"
-                    placeholder="ENTER ID"
+                    placeholder="ENTER_IDENTIFIER"
                     value={studentId}
                     onChange={(e) => setStudentId(e.target.value)}
                 />

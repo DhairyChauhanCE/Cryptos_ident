@@ -48,16 +48,19 @@ export const getIdentityVerificationStatus = async (address) => {
         const [isRegistered, acts] = await Promise.all([
             registry.isRegistered(address),
             Promise.all([
-                registry.isAgeVerified(address),
-                registry.isNationalityVerified(address),
-                registry.isStudentVerified(address),
-                registry.isRevoked(address, 0), // AGE_OVER_18
-                registry.isRevoked(address, 1), // NATIONALITY_MATCH
-                registry.isRevoked(address, 2)  // UNIVERSITY_STUDENT
+                registry.isVerified(address, 0), // AGE_OVER_18
+                registry.isVerified(address, 1), // NATIONALITY_MATCH
+                registry.isVerified(address, 2), // UNIVERSITY_STUDENT
+                registry.isRevoked(address, 0),
+                registry.isRevoked(address, 1),
+                registry.isRevoked(address, 2)
             ])
         ]);
 
-        const [isAge, isNat, isStu, revAge, revNat, revStu] = acts;
+        const [ageRes, natRes, stuRes, revAge, revNat, revStu] = acts;
+        const isAge = ageRes[0];
+        const isNat = natRes[0];
+        const isStu = stuRes[0];
 
         return {
             registered: isRegistered,
@@ -78,13 +81,17 @@ export const getIdentityVerificationStatus = async (address) => {
 };
 
 /**
- * Administrative Registration
+ * Administrative Registration (Commitment-based)
+ * @param {string} commitment The Poseidon hash (decimal string)
  */
-export const registerIdentityOnChain = async (did) => {
+export const registerIdentityOnChain = async (commitment) => {
     // Use unified entry point (signer required)
     const registry = await getRegistryContract(false);
-    const tx = await registry.registerIdentity(did);
+
+    // Format commitment to bytes32 hex
+    const formattedCommitment = "0x" + BigInt(commitment).toString(16).padStart(64, '0');
+
+    const tx = await registry.registerIdentity(formattedCommitment);
     await tx.wait();
     return tx.hash;
 };
-bitumen

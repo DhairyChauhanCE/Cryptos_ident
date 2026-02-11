@@ -1,25 +1,94 @@
 {
   "abi": [
     {
+      "inputs": [],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
       "inputs": [
         {
           "internalType": "address",
-          "name": "_ageVerifier",
-          "type": "address"
-        },
-        {
-          "internalType": "address",
-          "name": "_nationalityVerifier",
-          "type": "address"
-        },
-        {
-          "internalType": "address",
-          "name": "_studentVerifier",
+          "name": "target",
           "type": "address"
         }
       ],
-      "stateMutability": "nonpayable",
-      "type": "constructor"
+      "name": "AddressEmptyCode",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "implementation",
+          "type": "address"
+        }
+      ],
+      "name": "ERC1967InvalidImplementation",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "ERC1967NonPayable",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "FailedCall",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "InvalidInitialization",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "NotInitializing",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "owner",
+          "type": "address"
+        }
+      ],
+      "name": "OwnableInvalidOwner",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "OwnableUnauthorizedAccount",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "ReentrancyGuardReentrantCall",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "UUPSUnauthorizedCallContext",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "slot",
+          "type": "bytes32"
+        }
+      ],
+      "name": "UUPSUnsupportedProxiableUUID",
+      "type": "error"
     },
     {
       "anonymous": false,
@@ -82,9 +151,9 @@
         },
         {
           "indexed": false,
-          "internalType": "string",
-          "name": "did",
-          "type": "string"
+          "internalType": "bytes32",
+          "name": "identityHash",
+          "type": "bytes32"
         },
         {
           "indexed": false,
@@ -95,6 +164,127 @@
       ],
       "name": "IdentityRegistered",
       "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "uint64",
+          "name": "version",
+          "type": "uint64"
+        }
+      ],
+      "name": "Initialized",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "previousOwner",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "newOwner",
+          "type": "address"
+        }
+      ],
+      "name": "OwnershipTransferStarted",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "previousOwner",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "newOwner",
+          "type": "address"
+        }
+      ],
+      "name": "OwnershipTransferred",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "implementation",
+          "type": "address"
+        }
+      ],
+      "name": "Upgraded",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "enum IdentityRegistry.ClaimType",
+          "name": "claimType",
+          "type": "uint8"
+        },
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "newVerifier",
+          "type": "address"
+        }
+      ],
+      "name": "VerifierUpdated",
+      "type": "event"
+    },
+    {
+      "inputs": [],
+      "name": "UPGRADE_INTERFACE_VERSION",
+      "outputs": [
+        {
+          "internalType": "string",
+          "name": "",
+          "type": "string"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "acceptOwnership",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_user",
+          "type": "address"
+        },
+        {
+          "internalType": "enum IdentityRegistry.ClaimType",
+          "name": "_claimType",
+          "type": "uint8"
+        }
+      ],
+      "name": "adminRevokeClaim",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
     },
     {
       "inputs": [],
@@ -117,12 +307,12 @@
           "type": "address"
         }
       ],
-      "name": "getDID",
+      "name": "getIdentityHash",
       "outputs": [
         {
-          "internalType": "string",
+          "internalType": "bytes32",
           "name": "",
-          "type": "string"
+          "type": "bytes32"
         }
       ],
       "stateMutability": "view",
@@ -132,38 +322,23 @@
       "inputs": [
         {
           "internalType": "address",
-          "name": "user",
+          "name": "_ageVerifier",
           "type": "address"
-        }
-      ],
-      "name": "isAgeVerified",
-      "outputs": [
-        {
-          "internalType": "bool",
-          "name": "",
-          "type": "bool"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
+        },
         {
           "internalType": "address",
-          "name": "user",
+          "name": "_nationalityVerifier",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "_studentVerifier",
           "type": "address"
         }
       ],
-      "name": "isNationalityVerified",
-      "outputs": [
-        {
-          "internalType": "bool",
-          "name": "",
-          "type": "bool"
-        }
-      ],
-      "stateMutability": "view",
+      "name": "initialize",
+      "outputs": [],
+      "stateMutability": "nonpayable",
       "type": "function"
     },
     {
@@ -191,9 +366,14 @@
           "internalType": "address",
           "name": "user",
           "type": "address"
+        },
+        {
+          "internalType": "enum IdentityRegistry.ClaimType",
+          "name": "claimType",
+          "type": "uint8"
         }
       ],
-      "name": "isStudentVerified",
+      "name": "isRevoked",
       "outputs": [
         {
           "internalType": "bool",
@@ -247,6 +427,25 @@
       "type": "function"
     },
     {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "nullifiers",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
       "inputs": [],
       "name": "owner",
       "outputs": [
@@ -260,11 +459,37 @@
       "type": "function"
     },
     {
+      "inputs": [],
+      "name": "pendingOwner",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "proxiableUUID",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
       "inputs": [
         {
-          "internalType": "string",
-          "name": "_did",
-          "type": "string"
+          "internalType": "bytes32",
+          "name": "_identityHash",
+          "type": "bytes32"
         }
       ],
       "name": "registerIdentity",
@@ -273,16 +498,47 @@
       "type": "function"
     },
     {
+      "inputs": [],
+      "name": "renounceOwnership",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
       "inputs": [
         {
+          "internalType": "address",
+          "name": "_user",
+          "type": "address"
+        }
+      ],
+      "name": "revokeIdentity",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        },
+        {
           "internalType": "enum IdentityRegistry.ClaimType",
-          "name": "claimType",
+          "name": "",
           "type": "uint8"
         }
       ],
-      "name": "revokeClaim",
-      "outputs": [],
-      "stateMutability": "nonpayable",
+      "name": "revokedClaims",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
       "type": "function"
     },
     {
@@ -296,6 +552,55 @@
         }
       ],
       "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "newOwner",
+          "type": "address"
+        }
+      ],
+      "name": "transferOwnership",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "enum IdentityRegistry.ClaimType",
+          "name": "claimType",
+          "type": "uint8"
+        },
+        {
+          "internalType": "address",
+          "name": "newVerifier",
+          "type": "address"
+        }
+      ],
+      "name": "updateVerifier",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "newImplementation",
+          "type": "address"
+        },
+        {
+          "internalType": "bytes",
+          "name": "data",
+          "type": "bytes"
+        }
+      ],
+      "name": "upgradeToAndCall",
+      "outputs": [],
+      "stateMutability": "payable",
       "type": "function"
     },
     {
@@ -316,9 +621,9 @@
           "type": "uint256[2]"
         },
         {
-          "internalType": "uint256[2]",
+          "internalType": "uint256[4]",
           "name": "publicSignals",
-          "type": "uint256[2]"
+          "type": "uint256[4]"
         }
       ],
       "name": "verifyAge",
@@ -344,9 +649,9 @@
           "type": "uint256[2]"
         },
         {
-          "internalType": "uint256[2]",
+          "internalType": "uint256[3]",
           "name": "publicSignals",
-          "type": "uint256[2]"
+          "type": "uint256[3]"
         }
       ],
       "name": "verifyNationality",
@@ -372,9 +677,9 @@
           "type": "uint256[2]"
         },
         {
-          "internalType": "uint256[2]",
+          "internalType": "uint256[3]",
           "name": "publicSignals",
-          "type": "uint256[2]"
+          "type": "uint256[3]"
         }
       ],
       "name": "verifyStudent",

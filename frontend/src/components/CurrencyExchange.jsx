@@ -51,19 +51,21 @@ const CurrencyExchange = ({ address, identity, identityState, chainIdentity }) =
             initial="hidden"
             animate="visible"
         >
-            <header className="flex-between" style={{ marginBottom: '2rem' }}>
-                <div>
-                    <h2 style={{ fontSize: '1.5rem', color: 'var(--accent-mint)' }}>CURRENCY_TERMINAL</h2>
-                    <p style={{ color: 'var(--text-dim)', fontSize: '0.8rem' }}>DECENTRALIZED_ASSET_EXCHANGE_v3.0</p>
-                </div>
-                <div className="glass-card" style={{ padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                    <TrendingUp size={16} color="var(--accent-mint)" />
-                    <span className="mono" style={{ fontSize: '0.9rem' }}>EC/USD: ${price}</span>
+            <header style={{ marginBottom: 'calc(var(--space-unit) * 4)' }}>
+                <div className="flex-between">
+                    <div>
+                        <h2 className="view-header">CURRENCY_TERMINAL</h2>
+                        <p className="view-subtitle">DECENTRALIZED_ASSET_EXCHANGE_v3.0</p>
+                    </div>
+                    <div className="glass-card" style={{ padding: 'calc(var(--space-unit) * 1.5) calc(var(--space-unit) * 3)', display: 'flex', alignItems: 'center', gap: 'var(--space-unit)' }}>
+                        <TrendingUp size={16} color="var(--accent-primary)" />
+                        <span className="mono" style={{ fontSize: '0.85rem' }}>EC/USD: ${price}</span>
+                    </div>
                 </div>
             </header>
 
-            <div className="dashboard-grid" style={{ gridTemplateColumns: 'minmax(400px, 2fr) 1fr' }}>
-                <section>
+            <div className="dashboard-grid">
+                <section className="col-left">
                     <motion.div className="glass-card" variants={itemVariants} style={{ marginBottom: '1.5rem', position: 'relative', overflow: 'hidden' }}>
                         {!isAgeVerified && (
                             <div style={{
@@ -79,8 +81,8 @@ const CurrencyExchange = ({ address, identity, identityState, chainIdentity }) =
                                 textAlign: 'center',
                                 padding: '2rem'
                             }}>
-                                <Lock size={40} color="var(--accent-gold)" style={{ marginBottom: '1rem' }} />
-                                <h3 className="mono" style={{ color: 'var(--accent-gold)' }}>ACCESS_DENIED</h3>
+                                <Lock size={40} color="var(--accent-secondary)" style={{ marginBottom: '1rem' }} />
+                                <h3 className="mono" style={{ color: 'var(--accent-secondary)' }}>ACCESS_DENIED</h3>
                                 <p style={{ fontSize: '0.8rem', color: 'var(--text-main)', marginTop: '0.5rem' }}>
                                     TRADING REQUIRES AGE VERIFICATION (OVER 18).
                                 </p>
@@ -92,7 +94,7 @@ const CurrencyExchange = ({ address, identity, identityState, chainIdentity }) =
 
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
                             <h3 className="mono">BUY_EMERALD_CREDITS</h3>
-                            <Zap size={18} color="var(--accent-gold)" />
+                            <Zap size={18} color="var(--accent-secondary)" />
                         </div>
 
                         <div className="input-group">
@@ -107,7 +109,7 @@ const CurrencyExchange = ({ address, identity, identityState, chainIdentity }) =
                                     style={{ fontSize: '1.5rem', padding: '1rem' }}
                                     disabled={!isAgeVerified}
                                 />
-                                <span className="mono" style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--accent-mint)' }}>USD</span>
+                                <span className="mono" style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--accent-primary)' }}>USD</span>
                             </div>
                         </div>
 
@@ -135,12 +137,12 @@ const CurrencyExchange = ({ address, identity, identityState, chainIdentity }) =
                     </motion.div>
                 </section>
 
-                <section>
+                <section className="col-right">
                     <motion.div className="glass-card" variants={itemVariants}>
                         <h3 className="mono" style={{ fontSize: '0.8rem', marginBottom: '1.5rem' }}>COMPLIANCE_STATUS</h3>
                         <div className="profile-field">
                             <span className="profile-label">ON_CHAIN_AGE_GATE</span>
-                            <div className="profile-value" style={{ color: isAgeVerified ? 'var(--accent-mint)' : 'var(--accent-gold)' }}>
+                            <div className="profile-value" style={{ color: isAgeVerified ? 'var(--accent-primary)' : 'var(--accent-secondary)' }}>
                                 {isAgeVerified ? 'VERIFIED_OK' : 'LOCKED'}
                             </div>
                         </div>
@@ -154,21 +156,32 @@ const CurrencyExchange = ({ address, identity, identityState, chainIdentity }) =
                         </div>
                     </motion.div>
 
-                    <motion.div className="glass-card" variants={itemVariants} style={{ marginTop: '1.5rem', border: '1px solid var(--accent-gold)', background: 'rgba(197, 160, 89, 0.05)' }}>
+                    <div className="glass-card" style={{
+                        marginTop: 'calc(var(--space-unit) * 2)',
+                        border: '1px solid var(--accent-secondary)',
+                        background: 'rgba(168, 85, 247, 0.05)',
+                        padding: 'var(--space-unit) calc(var(--space-unit) * 2)'
+                    }}>
                         <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center' }}>
-                            <ShieldCheck size={20} color="var(--accent-gold)" />
+                            <ShieldCheck size={20} color="var(--accent-secondary)" />
                             <div>
-                                <h4 style={{ fontSize: '0.75rem', color: 'var(--accent-gold)' }}>SECURE_ENCLAVE</h4>
-                                <p style={{ fontSize: '0.65rem', color: 'var(--text-dim)' }}>Age-Restricted Trading enforced via ZK-SNARK verifier on-chain.</p>
+                                <h4 className="mono" style={{ fontSize: '0.75rem', color: 'var(--accent-secondary)' }}>SECURE_ENCLAVE</h4>
+                                <p style={{ fontSize: '0.65rem', color: 'var(--text-dim)', marginTop: '0.2rem' }}>Age-Restricted Trading enforced via ZK-SNARK verifier on-chain.</p>
                             </div>
                         </div>
-                    </motion.div>
+                    </div>
 
                     {!isAgeVerified && (
-                        <div style={{ marginTop: '1.5rem', padding: '1rem', border: '1px solid #ff4444', borderRadius: '4px', background: 'rgba(255, 68, 68, 0.05)' }}>
+                        <div style={{
+                            marginTop: 'calc(var(--space-unit) * 2)',
+                            padding: 'var(--space-unit) calc(var(--space-unit) * 2)',
+                            border: '1px solid var(--accent-red)',
+                            borderRadius: 'var(--radius-sharp)',
+                            background: 'rgba(255, 68, 68, 0.05)'
+                        }}>
                             <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center' }}>
-                                <AlertTriangle size={16} color="#ff4444" />
-                                <span style={{ fontSize: '0.7rem', color: '#ff4444' }}>REQUIRED: Submit Age Proof</span>
+                                <AlertTriangle size={16} color="var(--accent-red)" />
+                                <span className="mono" style={{ fontSize: '0.7rem', color: 'var(--accent-red)' }}>REQUIRED: Submit Age Proof</span>
                             </div>
                         </div>
                     )}

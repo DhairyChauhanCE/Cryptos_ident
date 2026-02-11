@@ -43,14 +43,17 @@ contract Nationality_verificationVerifier {
     uint256 constant deltay2 = 8495653923123431417604973247489272438418190587263600148770280649306958101930;
 
     
-    uint256 constant IC0x = 20027518924649068479711076078620544274863712850193452084020295863056689020882;
-    uint256 constant IC0y = 18880374159233186339046150012907869872011696421770714254269216084718388332812;
+    uint256 constant IC0x = 21049987058606025053363678480785575175184642329102973981844217546033533329122;
+    uint256 constant IC0y = 4610462314764695345512037463636716266846122051453614083247739298899166114989;
     
-    uint256 constant IC1x = 17406801934877183239339212489269728452600335674671530068271852743037810413721;
-    uint256 constant IC1y = 3720158645400440169172965185474830951120720002927982395890638640284328195740;
+    uint256 constant IC1x = 12649670290616418719287241171094759264199652395013653535991079050889225377851;
+    uint256 constant IC1y = 14663101609875890348772859062064133945199902075767674669025450816016179483692;
     
-    uint256 constant IC2x = 11677348718861657715104898503123534210445649414267885182463931326348218972214;
-    uint256 constant IC2y = 9849540909346540203528999991428939240463706314555140800436012115554051101632;
+    uint256 constant IC2x = 15357561482613619241499365656222150913489524141929417219897924478384286253169;
+    uint256 constant IC2y = 14590419516262613117326604653963274697398051367974103909688033320312381788858;
+    
+    uint256 constant IC3x = 15432860529518934626374514900672539647277093222483518320011795852489256888134;
+    uint256 constant IC3y = 18145539546720629893191375867484888823682305588949187791449835867068165978847;
     
  
     // Memory data
@@ -59,7 +62,7 @@ contract Nationality_verificationVerifier {
 
     uint16 constant pLastMem = 896;
 
-    function verifyProof(uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[2] calldata _pubSignals) public view returns (bool) {
+    function verifyProof(uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[3] calldata _pubSignals) public view returns (bool) {
         assembly {
             function checkField(v) {
                 if iszero(lt(v, r)) {
@@ -106,6 +109,8 @@ contract Nationality_verificationVerifier {
                 g1_mulAccC(_pVk, IC1x, IC1y, calldataload(add(pubSignals, 0)))
                 
                 g1_mulAccC(_pVk, IC2x, IC2y, calldataload(add(pubSignals, 32)))
+                
+                g1_mulAccC(_pVk, IC3x, IC3y, calldataload(add(pubSignals, 64)))
                 
 
                 // -A
@@ -163,6 +168,8 @@ contract Nationality_verificationVerifier {
             checkField(calldataload(add(_pubSignals, 0)))
             
             checkField(calldataload(add(_pubSignals, 32)))
+            
+            checkField(calldataload(add(_pubSignals, 64)))
             
 
             // Validate all evaluations

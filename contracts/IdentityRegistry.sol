@@ -1,27 +1,29 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.24;
 
-import "./Age_verificationVerifier.sol";
-import "./Nationality_verificationVerifier.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
-/**
- * @title IdentityRegistry
- * @dev Manages decentralized identities and verification proofs
- * @notice Users can register DIDs and submit ZK proofs for various claims
- */
 interface IAgeVerifier {
-    function verifyProof(uint[2] memory a, uint[2][2] memory b, uint[2] memory c, uint[2] memory input) external view returns (bool);
+    function verifyProof(uint[2] memory a, uint[2][2] memory b, uint[2] memory c, uint[4] memory input) external view returns (bool);
 }
 
 interface INationalityVerifier {
-    function verifyProof(uint[2] memory a, uint[2][2] memory b, uint[2] memory c, uint[2] memory input) external view returns (bool);
+    function verifyProof(uint[2] memory a, uint[2][2] memory b, uint[2] memory c, uint[3] memory input) external view returns (bool);
 }
 
 interface IStudentVerifier {
-    function verifyProof(uint[2] memory a, uint[2][2] memory b, uint[2] memory c, uint[2] memory input) external view returns (bool);
+    function verifyProof(uint[2] memory a, uint[2][2] memory b, uint[2] memory c, uint[3] memory input) external view returns (bool);
 }
 
-contract IdentityRegistry {
+/**
+ * @title IdentityRegistry
+ * @dev Manages decentralized identities and verification proofs (UUPS Upgradeable)
+ * Hardened for production with ReentrancyGuard and Nullifier protection.
+ */
+contract IdentityRegistry is Initializable, UUPSUpgradeable, Ownable2StepUpgradeable, ReentrancyGuardUpgradeable {
     // Claim types
     enum ClaimType {
         AGE_OVER_18,
@@ -30,7 +32,6 @@ contract IdentityRegistry {
     }
     
     // Verifier contracts
-    address public owner;
     IAgeVerifier public ageVerifier;
     INationalityVerifier public nationalityVerifier;
     IStudentVerifier public studentVerifier;
@@ -38,7 +39,7 @@ contract IdentityRegistry {
     // Identity structure
     struct Identity {
         address wallet;
-        string did;
+        bytes32 identityHash; // The Poseidon commitment
         bool registered;
         mapping(ClaimType => bool) verifiedClaims;
         mapping(ClaimType => uint256) verificationTimestamp;
@@ -47,72 +48,58 @@ contract IdentityRegistry {
     
     // Storage
     mapping(address => Identity) private identities;
-    mapping(uint256 => bool) private usedNonces;
+    mapping(uint256 => bool) public nullifiers; // Nullifier system (replacing usedNonces)
     
-    // Revocation Registry (Judge Grade Feature)
+    // Revocation Registry
     mapping(address => mapping(ClaimType => bool)) public revokedClaims;
     
     // Events
-    event IdentityRegistered(address indexed user, string did, uint256 timestamp);
+    event IdentityRegistered(address indexed user, bytes32 identityHash, uint256 timestamp);
     event ClaimVerified(address indexed user, ClaimType claimType, uint256 timestamp);
     event ClaimRevoked(address indexed user, ClaimType claimType, uint256 timestamp);
     event VerifierUpdated(ClaimType indexed claimType, address newVerifier);
     
-    modifier onlyOwner() {
-        require(msg.sender == owner, "Caller is not the owner");
-        _;
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
     }
 
     /**
-     * @dev Constructor - deploys or links to verifier contracts
+     * @dev Initialize function for UUPS proxy
      */
-    constructor(address _ageVerifier, address _nationalityVerifier, address _studentVerifier) {
-        owner = msg.sender;
+    function initialize(
+        address _ageVerifier, 
+        address _nationalityVerifier, 
+        address _studentVerifier
+    ) public initializer {
+        __Ownable_init(msg.sender);
+        __UUPSUpgradeable_init();
+        __ReentrancyGuard_init();
+
         ageVerifier = IAgeVerifier(_ageVerifier);
         nationalityVerifier = INationalityVerifier(_nationalityVerifier);
         studentVerifier = IStudentVerifier(_studentVerifier);
     }
 
     /**
-     * @dev Update Verifiers (Upgradeability Feature)
+     * @dev Authorize upgrade (UUPS requirement)
      */
-    function updateAgeVerifier(address _newVerifier) external onlyOwner {
-        ageVerifier = IAgeVerifier(_newVerifier);
-        emit VerifierUpdated(ClaimType.AGE_OVER_18, _newVerifier);
-    }
-
-    function updateNationalityVerifier(address _newVerifier) external onlyOwner {
-        nationalityVerifier = INationalityVerifier(_newVerifier);
-        emit VerifierUpdated(ClaimType.NATIONALITY_MATCH, _newVerifier);
-    }
-
-    function updateStudentVerifier(address _newVerifier) external onlyOwner {
-        studentVerifier = IStudentVerifier(_newVerifier);
-        emit VerifierUpdated(ClaimType.UNIVERSITY_STUDENT, _newVerifier);
-    }
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     /**
-     * @dev Administrative Revocation (GDPR / Anti-Fraud Compliance)
+     * @dev Register a new decentralized identifier (as a commitment)
      */
-    function adminRevokeClaim(address _user, ClaimType _claimType) external onlyOwner {
-        identities[_user].verifiedClaims[_claimType] = false;
-        revokedClaims[_user][_claimType] = true;
-        emit ClaimRevoked(_user, _claimType, block.timestamp);
-    }
-    
-    /**
-     * @dev Register a new decentralized identifier
-     */
-    function registerIdentity(string memory _did) external {
+    function registerIdentity(bytes32 _identityHash) external nonReentrant {
         require(!identities[msg.sender].registered, "Identity already registered");
-        require(bytes(_did).length > 0, "DID cannot be empty");
+        require(_identityHash != 0, "Commitment cannot be zero");
         
-        identities[msg.sender].wallet = msg.sender;
-        identities[msg.sender].did = _did;
-        identities[msg.sender].registered = true;
-        identities[msg.sender].registeredAt = block.timestamp;
+        Identity storage identity = identities[msg.sender];
+        identity.wallet = msg.sender;
+        identity.identityHash = _identityHash;
+        identity.registered = true;
+        identity.registeredAt = block.timestamp;
         
-        emit IdentityRegistered(msg.sender, _did, block.timestamp);
+        emit IdentityRegistered(msg.sender, _identityHash, block.timestamp);
     }
     
     /**
@@ -122,16 +109,16 @@ contract IdentityRegistry {
         uint[2] memory a,
         uint[2][2] memory b,
         uint[2] memory c,
-        uint[2] memory publicSignals
-    ) external {
+        uint[4] memory publicSignals
+    ) external nonReentrant {
         require(identities[msg.sender].registered, "Identity not registered");
-        require(!usedNonces[publicSignals[1]], "Proof already used (nonce replay)");
-        require(!revokedClaims[msg.sender][ClaimType.AGE_OVER_18], "Claim suspended by authority");
+        require(bytes32(publicSignals[0]) == identities[msg.sender].identityHash, "Commitment mismatch");
+        require(!nullifiers[publicSignals[3]], "NULLIFIER_EXHAUSTED: Proof Replay");
+        require(!revokedClaims[msg.sender][ClaimType.AGE_OVER_18], "Claim suspended");
         
-        bool valid = ageVerifier.verifyProof(a, b, c, publicSignals);
-        require(valid, "Invalid proof");
+        require(ageVerifier.verifyProof(a, b, c, publicSignals), "INVALID_ZK_PROOF");
         
-        usedNonces[publicSignals[1]] = true;
+        nullifiers[publicSignals[3]] = true;
         identities[msg.sender].verifiedClaims[ClaimType.AGE_OVER_18] = true;
         identities[msg.sender].verificationTimestamp[ClaimType.AGE_OVER_18] = block.timestamp;
         
@@ -145,16 +132,16 @@ contract IdentityRegistry {
         uint[2] memory a,
         uint[2][2] memory b,
         uint[2] memory c,
-        uint[2] memory publicSignals
-    ) external {
+        uint[3] memory publicSignals
+    ) external nonReentrant {
         require(identities[msg.sender].registered, "Identity not registered");
-        require(!usedNonces[publicSignals[1]], "Proof already used (nonce replay)");
-        require(!revokedClaims[msg.sender][ClaimType.NATIONALITY_MATCH], "Claim suspended by authority");
+        require(bytes32(publicSignals[0]) == identities[msg.sender].identityHash, "Commitment mismatch");
+        require(!nullifiers[publicSignals[2]], "NULLIFIER_EXHAUSTED");
+        require(!revokedClaims[msg.sender][ClaimType.NATIONALITY_MATCH], "Claim suspended");
         
-        bool valid = nationalityVerifier.verifyProof(a, b, c, publicSignals);
-        require(valid, "Invalid proof");
+        require(nationalityVerifier.verifyProof(a, b, c, publicSignals), "INVALID_ZK_PROOF");
         
-        usedNonces[publicSignals[1]] = true;
+        nullifiers[publicSignals[2]] = true;
         identities[msg.sender].verifiedClaims[ClaimType.NATIONALITY_MATCH] = true;
         identities[msg.sender].verificationTimestamp[ClaimType.NATIONALITY_MATCH] = block.timestamp;
         
@@ -168,68 +155,69 @@ contract IdentityRegistry {
         uint[2] memory a,
         uint[2][2] memory b,
         uint[2] memory c,
-        uint[2] memory publicSignals
-    ) external {
+        uint[3] memory publicSignals
+    ) external nonReentrant {
         require(identities[msg.sender].registered, "Identity not registered");
-        require(!usedNonces[publicSignals[1]], "Proof already used (nonce replay)");
-        require(!revokedClaims[msg.sender][ClaimType.UNIVERSITY_STUDENT], "Claim suspended by authority");
+        require(bytes32(publicSignals[0]) == identities[msg.sender].identityHash, "Commitment mismatch");
+        require(!nullifiers[publicSignals[2]], "NULLIFIER_EXHAUSTED");
+        require(!revokedClaims[msg.sender][ClaimType.UNIVERSITY_STUDENT], "Claim suspended");
         
-        bool valid = studentVerifier.verifyProof(a, b, c, publicSignals);
-        require(valid, "Invalid proof");
+        require(studentVerifier.verifyProof(a, b, c, publicSignals), "INVALID_ZK_PROOF");
         
-        usedNonces[publicSignals[1]] = true;
+        nullifiers[publicSignals[2]] = true;
         identities[msg.sender].verifiedClaims[ClaimType.UNIVERSITY_STUDENT] = true;
         identities[msg.sender].verificationTimestamp[ClaimType.UNIVERSITY_STUDENT] = block.timestamp;
         
         emit ClaimVerified(msg.sender, ClaimType.UNIVERSITY_STUDENT, block.timestamp);
     }
 
-    function isAgeVerified(address user) external view returns (bool) {
-        return identities[user].verifiedClaims[ClaimType.AGE_OVER_18];
+    // View Functions
+    function isRegistered(address user) external view returns (bool) {
+        return identities[user].registered;
     }
 
-    function isNationalityVerified(address user) external view returns (bool) {
-        return identities[user].verifiedClaims[ClaimType.NATIONALITY_MATCH];
+    function getIdentityHash(address user) external view returns (bytes32) {
+        require(identities[user].registered, "Not registered");
+        return identities[user].identityHash;
     }
 
-    function isStudentVerified(address user) external view returns (bool) {
-        return identities[user].verifiedClaims[ClaimType.UNIVERSITY_STUDENT];
-    }
-    
-    function isVerified(address user, ClaimType claimType) 
-        external 
-        view 
-        returns (bool verified, uint256 timestamp) 
-    {
-        return (
-            identities[user].verifiedClaims[claimType],
-            identities[user].verificationTimestamp[claimType]
-        );
+    function isVerified(address user, ClaimType claimType) external view returns (bool verified, uint256 timestamp) {
+        return (identities[user].verifiedClaims[claimType], identities[user].verificationTimestamp[claimType]);
     }
 
     function isRevoked(address user, ClaimType claimType) external view returns (bool) {
         return revokedClaims[user][claimType];
     }
-    
-    function getDID(address user) external view returns (string memory) {
-        require(identities[user].registered, "Identity not registered");
-        return identities[user].did;
+
+    // Governance & Compliance
+    function updateVerifier(ClaimType claimType, address newVerifier) external onlyOwner {
+        if (claimType == ClaimType.AGE_OVER_18) ageVerifier = IAgeVerifier(newVerifier);
+        else if (claimType == ClaimType.NATIONALITY_MATCH) nationalityVerifier = INationalityVerifier(newVerifier);
+        else if (claimType == ClaimType.UNIVERSITY_STUDENT) studentVerifier = IStudentVerifier(newVerifier);
+        emit VerifierUpdated(claimType, newVerifier);
     }
-    
-    function isRegistered(address user) external view returns (bool) {
-        return identities[user].registered;
+
+    function adminRevokeClaim(address _user, ClaimType _claimType) external onlyOwner {
+        identities[_user].verifiedClaims[_claimType] = false;
+        revokedClaims[_user][_claimType] = true;
+        emit ClaimRevoked(_user, _claimType, block.timestamp);
     }
-    
+
     /**
-     * @dev User-driven revocation of their own claim
+     * @dev Full Identity Revocation (Phase 2 Extreme Security)
      */
-    function revokeOwnClaim(ClaimType claimType) external {
-        require(identities[msg.sender].registered, "Identity not registered");
-        require(identities[msg.sender].verifiedClaims[claimType], "Claim not verified");
+    function revokeIdentity(address _user) external onlyOwner {
+        identities[_user].verifiedClaims[ClaimType.AGE_OVER_18] = false;
+        identities[_user].verifiedClaims[ClaimType.NATIONALITY_MATCH] = false;
+        identities[_user].verifiedClaims[ClaimType.UNIVERSITY_STUDENT] = false;
         
-        identities[msg.sender].verifiedClaims[claimType] = false;
-        identities[msg.sender].verificationTimestamp[claimType] = 0;
+        revokedClaims[_user][ClaimType.AGE_OVER_18] = true;
+        revokedClaims[_user][ClaimType.NATIONALITY_MATCH] = true;
+        revokedClaims[_user][ClaimType.UNIVERSITY_STUDENT] = true;
         
-        emit ClaimRevoked(msg.sender, claimType, block.timestamp);
+        emit ClaimRevoked(_user, ClaimType.AGE_OVER_18, block.timestamp);
     }
+
+    // Gaps for future state additions in upgrades
+    uint256[50] private __gap;
 }

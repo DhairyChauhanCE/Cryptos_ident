@@ -1,10 +1,9 @@
-import * as snarkjs from 'snarkjs';
 import { getRegistryContract } from './identity.service';
 
 /**
  * Proof Service
  * Centralized logic for ZK proof generation and submission to Ethereum.
- * Integrated with Unified Registry Access (Phase 12).
+ * Uses Web Workers for background proving (Phase 3).
  */
 
 const formatCalldata = (proof, publicSignals) => {
@@ -43,20 +42,43 @@ export const proveOnChain = async (type, inputs) => {
     const wasmPath = `/circuits/${circuitName}/${circuitName}.wasm`;
     const zkeyPath = `/circuits/${circuitName}/${circuitName}.zkey`;
 
-    // 1. Generate Proof
-    const { proof, publicSignals } = await snarkjs.groth16.fullProve(
-        inputs,
-        wasmPath,
-        zkeyPath
-    );
+    // 1. Generate Proof via Web Worker
+    const { proof, publicSignals } = await new Promise((resolve, reject) => {
+        const worker = new Worker(new URL('../workers/zkProver.worker.js', import.meta.url));
 
-    // 2. Submit Transaction using Unified Signer
+        worker.onmessage = (e) => {
+            if (e.data.success) {
+                resolve({ proof: e.data.proof, publicSignals: e.data.publicSignals });
+            } else {
+                reject(new Error(e.data.error));
+            }
+            worker.terminate();
+        };
+
+        worker.onerror = (err) => {
+            reject(err);
+            worker.terminate();
+        };
+
+        worker.postMessage({
+            type,
+            inputs,
+            wasmPath,
+            zkeyPath
+        });
+    });
+
+    // 2. Submit Transaction
     const registry = await getRegistryContract(false);
-
     const callData = formatCalldata(proof, publicSignals);
-    const tx = await registry[methodName](callData.a, callData.b, callData.c, callData.input);
+
+    const tx = await registry[methodName](
+        callData.a,
+        callData.b,
+        callData.c,
+        callData.input
+    );
     await tx.wait();
 
     return tx.hash;
 };
-bitumen

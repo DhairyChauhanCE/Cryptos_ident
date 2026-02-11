@@ -1,43 +1,36 @@
+pragma circom 2.0.0;
+
+include "../node_modules/circomlib/circuits/poseidon.circom";
+include "../node_modules/circomlib/circuits/comparators.circom";
+
 template NationalityVerification() {
-    // Private inputs (not revealed)
-    signal private input nationality;   // User's nationality code
-    signal private input salt;          // Unique salt for privacy
+    // Private identity data
+    signal input dob;           // YYYYMMDD
+    signal input nationality;   // ISO Numeric
+    signal input studentId;     // Hashed or numeric ID
+    signal input userSalt;      // Privacy salt
     
     // Public inputs
-    signal input expectedNationality;   // Required nationality code
-    signal input nonce;                 // Replay protection nonce
+    signal input identityHash;      // Poseidon(dob, nationality, studentId, userSalt)
+    signal input requiredCountry;   // The country we are verifying for
+    signal input nonce;             // Replay protection
     
-    // Check equality
+    // 1. Verify Commitment
+    component hasher = Poseidon(4);
+    hasher.inputs[0] <== dob;
+    hasher.inputs[1] <== nationality;
+    hasher.inputs[2] <== studentId;
+    hasher.inputs[3] <== userSalt;
+    
+    hasher.out === identityHash;
+    
+    // 2. Verify Nationality Match
     component isEqual = IsEqual();
     isEqual.in[0] <== nationality;
-    isEqual.in[1] <== expectedNationality;
+    isEqual.in[1] <== requiredCountry;
     
-    // ENFORCE: proof valid only if match
     isEqual.out === 1;
 }
 
-// Helper template for equality check
-template IsEqual() {
-    signal input in[2];
-    signal output out;
-    
-    component isz = IsZero();
-    isz.in <== in[1] - in[0];
-    
-    out <== isz.out;
-}
+component main {public [identityHash, requiredCountry, nonce]} = NationalityVerification();
 
-// IsZero template
-template IsZero() {
-    signal input in;
-    signal output out;
-    
-    signal inv;
-    
-    inv <-- in!=0 ? 1/in : 0;
-    
-    out <== -in*inv +1;
-    in*out === 0;
-}
-
-component main = NationalityVerification();

@@ -34,25 +34,26 @@ async function compileCircuit(circuitName, circuitFile) {
 
     // Compile circuit to R1CS, WASM, and symbols
     console.log('  ├─ Generating R1CS, WASM, and symbols...');
-    // Circom v0 ignores -o for many files and puts them in CWD
-    const compileCmd = `npx circom "${circuitPath}" --r1cs --wasm --sym`;
+    // Use local circom.exe. Circom 2.x creates a _js directory for WASM
+    const compileCmd = `.\\circom.exe "${circuitPath}" --r1cs --wasm --sym -o "${outputDir}"`;
     await execAsync(compileCmd);
 
-    // Manually move files from root to outputDir
-    const files = [`${circuitName}.r1cs`, `${circuitName}.wasm`, `${circuitName}.sym`];
-    for (const file of files) {
-        const src = path.join(__dirname, '..', file);
-        const dest = path.join(outputDir, file);
-        try {
-            await fs.rename(src, dest);
-        } catch (e) {
-            console.log(`  ! Warning: could not move ${file}: ${e.message}`);
-        }
+    // Circom 2.x puts WASM in a directory named {circuitName}_js/
+    const wasmSourceDir = path.join(outputDir, `${circuitName}_js`);
+    const wasmSourceFile = path.join(wasmSourceDir, `${circuitName}.wasm`);
+    const wasmDestFile = path.join(outputDir, `${circuitName}.wasm`);
+
+    try {
+        await fs.rename(wasmSourceFile, wasmDestFile);
+        console.log(`  ├─ WASM moved to ${wasmDestFile}`);
+    } catch (e) {
+        console.log(`  ! Warning: could not move WASM from ${wasmSourceFile}: ${e.message}`);
     }
 
     console.log(`  ✓ Circuit compiled successfully`);
     return outputDir;
 }
+
 
 async function setupCeremony(circuitName, outputDir) {
     console.log(`\n🔐 Setting up trusted setup for ${circuitName}...`);

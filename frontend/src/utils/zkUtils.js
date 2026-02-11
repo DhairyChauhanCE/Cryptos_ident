@@ -1,4 +1,45 @@
 import * as snarkjs from 'snarkjs';
+import { buildPoseidon } from 'circomlibjs';
+
+let poseidon = null;
+
+/**
+ * Initialize Poseidon hasher
+ */
+const initPoseidon = async () => {
+    if (!poseidon) {
+        poseidon = await buildPoseidon();
+    }
+    return poseidon;
+};
+
+/**
+ * Calculate Poseidon hash for identity commitment
+ * @param {string} dob YYYYMMDD
+ * @param {string} nationality ISO Numeric
+ * @param {string} studentId Numeric ID
+ * @param {string} salt Hex string
+ * @returns {Promise<string>} Poseidon hash (decimal string)
+ */
+export const calculateIdentityHash = async (dob, nationality, studentId, salt) => {
+    const p = await initPoseidon();
+
+    // Convert inputs to BigInts
+    // dob: 20060101 -> BigInt
+    // nationality: 356 -> BigInt
+    // studentId: 12345 -> BigInt
+    // salt: hex -> BigInt
+
+    const inputs = [
+        BigInt(dob),
+        BigInt(nationality),
+        BigInt(studentId),
+        BigInt('0x' + salt)
+    ];
+
+    const hash = p(inputs);
+    return p.F.toString(hash);
+};
 
 /**
  * ZK Proof Utility Functions
@@ -14,7 +55,7 @@ export const generateProof = async (circuitName, inputs) => {
     console.log(`Generating proof for ${circuitName}...`);
 
     const wasmPath = `/circuits/${circuitName}/${circuitName}.wasm`;
-    const zkeyPath = `/circuits/${circuitName}/${circuitName}_final.zkey`;
+    const zkeyPath = `/circuits/${circuitName}/${circuitName}.zkey`;
 
     try {
         // Note: In a browser environment, WASM and zkey are fetched from public folder

@@ -17,6 +17,8 @@ import WalletConnection from './components/WalletConnection';
 import Sidebar from './components/Sidebar';
 import AnalyticsBars from './components/AnalyticsBars';
 import CurrencyExchange from './components/CurrencyExchange';
+import AdminPortal from './components/AdminPortal';
+import AuthPage from './components/AuthPage';
 
 // Abstraction Layers (Phase 3 & 4)
 import { useWallet } from './hooks/useWallet';
@@ -26,7 +28,7 @@ import { registerIdentityOnChain } from './services/identity.service';
 
 function App() {
     // SSOT: Wallet and Identity are now managed by hooks
-    const { address, isConnected, connect, disconnect, chainId, switchNetwork } = useWallet();
+    const { address, isConnected, connect, disconnect, chainId, switchNetwork, isConnecting, error: walletError } = useWallet();
     const { state: identityState, details: chainIdentity, refresh: refreshIdentity } = useIdentity(address);
 
     const [view, setView] = useState('landing');
@@ -68,12 +70,23 @@ function App() {
             const signature = await signer.signMessage(message);
             const key = ethers.keccak256(ethers.toUtf8Bytes(signature));
 
-            const stored = loadIdentity(key);
+            const stored = await loadIdentity(signature);
             if (stored) {
                 setLocalIdentity(stored);
-                setEncryptionKey(key);
+                setEncryptionKey(signature); // Store signature as the session root
+                setView('dashboard'); // Enter system
             } else {
-                alert("Security Violation: Decryption failed.");
+                // Check if there's stored data that might be corrupted
+                if (hasStoredIdentity()) {
+                    const shouldClear = confirm("Decryption failed. This can happen if you're using a different wallet or the data is corrupted. Would you like to clear the stored identity and start fresh?");
+                    if (shouldClear) {
+                        clearIdentity();
+                        setSessionKey(null);
+                        alert("Identity storage cleared. You can now create a new identity.");
+                    }
+                } else {
+                    alert("No stored identity found. Please create a new identity first.");
+                }
             }
         } catch (e) {
             console.error(e);
@@ -84,26 +97,34 @@ function App() {
     };
 
     const handleLogout = () => {
-        localStorage.removeItem('zk_identity_profile');
         setLocalIdentity(null);
         setEncryptionKey(null);
         setSessionKey(null);
         disconnect();
     };
 
+    const clearIdentity = () => {
+        localStorage.removeItem('zk_identity_profile');
+        setLocalIdentity(null);
+        setEncryptionKey(null);
+        setSessionKey(null);
+        alert("Local Identity Vault purged. You can now create a new cryptographic identity.");
+    };
+
     const handleIdentityCreated = (newIdentity, key) => {
         setLocalIdentity(newIdentity);
         setEncryptionKey(key);
+        // Automatically move to dashboard after creation
+        setView('dashboard');
     };
 
     const handleRegisterOnChain = async () => {
-        if (!address) return;
+        if (!address || !localIdentity) return;
         setIsRegistering(true);
         try {
-            const did = `did:ethr:${address}`;
-            await registerIdentityOnChain(did);
+            await registerIdentityOnChain(localIdentity.identityHash);
             refreshIdentity();
-            alert("DID Registered on Zero-Knowledge Ledger");
+            alert("Cryptographic Identity Registered on Zero-Knowledge Ledger");
         } catch (e) {
             console.error(e);
             alert("Registration failed.");
@@ -122,14 +143,37 @@ function App() {
                     exit={{ opacity: 0, y: -20 }}
                     transition={{ duration: 0.6 }}
                 >
-                    <LandingPage onEnter={() => setView('dashboard')} />
+                    <LandingPage
+                        onEnter={() => setView('auth')}
+                        isConnected={isConnected}
+                        address={address}
+                    />
+                </motion.div>
+            ) : view === 'auth' ? (
+                <motion.div
+                    key="auth"
+                    initial={{ opacity: 0, x: 100 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -100 }}
+                    transition={{ type: "spring", stiffness: 120, damping: 20 }}
+                >
+                    <AuthPage
+                        isConnected={isConnected}
+                        address={address}
+                        onConnect={connect}
+                        onUnlock={handleUnlock}
+                        isUnlocking={isUnlocking}
+                        hasStoredIdentity={hasStoredIdentity()}
+                        onEnterDashboard={() => setView('dashboard')}
+                    />
                 </motion.div>
             ) : (
                 <motion.div
                     key="dashboard"
                     className="app-container"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
+                    initial={{ opacity: 0, scale: 1.05 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ type: "spring", stiffness: 100, damping: 25 }}
                 >
                     <Sidebar
                         activeTab={activeTab}
@@ -150,6 +194,8 @@ function App() {
                                 isConnected={isConnected}
                                 chainId={chainId}
                                 switchNetwork={switchNetwork}
+                                isConnecting={isConnecting}
+                                error={walletError}
                             />
                         </header>
 
@@ -167,7 +213,8 @@ function App() {
                                         <section className="col-left">
                                             {!localIdentity ? (
                                                 <div className="glass-card">
-                                                    <h2 style={{ marginBottom: '1.5rem', color: 'var(--accent-gold)' }}>INITIATE IDENTITY</h2>
+                                                    <h2 className="view-header">INITIATE_IDENTITY</h2>
+                                                    <p className="view-subtitle" style={{ marginBottom: 'calc(var(--space-unit) * 3)' }}>ENCRYPTED_ID_REGISTRATION_v1.0</p>
                                                     {hasStoredIdentity() ? (
                                                         <div style={{ textAlign: 'center', padding: '1rem 0' }}>
                                                             <p style={{ color: 'var(--text-dim)', marginBottom: '1.5rem', fontSize: '0.8rem' }}>
@@ -196,7 +243,7 @@ function App() {
                                                     <div className="profile-card">
                                                         <h2 className="mono" style={{
                                                             fontSize: '1rem',
-                                                            color: identityState === 'revoked' ? 'var(--accent-red)' : 'var(--accent-mint)',
+                                                            color: identityState === 'revoked' ? 'var(--accent-red)' : 'var(--accent-primary)',
                                                             marginBottom: '1.5rem',
                                                             letterSpacing: '0.3em'
                                                         }}>
@@ -216,11 +263,20 @@ function App() {
                                                             <span className="profile-label">NATIONAL_ORIGIN_CODE</span>
                                                             <div className="profile-value">NAT_{localIdentity.nationality}</div>
                                                         </div>
+                                                        <div className="profile-field">
+                                                            <span className="profile-label">UNIVERSITY_AFFILIATION</span>
+                                                            <div className="profile-value">UNI_{localIdentity.university}</div>
+                                                        </div>
+                                                        <div className="profile-field">
+                                                            <span className="profile-label">STUDENT_IDENTIFIER</span>
+                                                            <div className="profile-value">ID_****{localIdentity.studentId?.toString().slice(-4)}</div>
+                                                        </div>
 
                                                         <div className={`clearance-badge ${identityState === 'revoked' ? 'revoked' : ''}`} style={{
-                                                            borderColor: identityState === 'revoked' ? 'var(--accent-red)' : 'var(--accent-mint)',
-                                                            color: identityState === 'revoked' ? 'var(--accent-red)' : 'var(--accent-mint)',
-                                                            background: identityState === 'revoked' ? 'rgba(255, 51, 102, 0.1)' : 'rgba(0, 255, 153, 0.1)'
+                                                            borderColor: identityState === 'revoked' ? 'var(--accent-red)' : 'var(--accent-primary)',
+                                                            color: identityState === 'revoked' ? 'var(--accent-red)' : 'var(--accent-primary)',
+                                                            background: identityState === 'revoked' ? 'rgba(255, 51, 102, 0.1)' : 'rgba(90, 90, 254, 0.1)',
+                                                            marginBottom: 'var(--space-unit)'
                                                         }}>
                                                             CLEARANCE: {identityState === 'revoked' ? 'REVOKED' : (identityState === 'verified' ? 'AUTHORIZED' : 'RESTRICTED')}
                                                         </div>
@@ -247,6 +303,22 @@ function App() {
                                                                 <VerificationBadge label="Nat" verified={chainIdentity?.nationality} />
                                                                 <VerificationBadge label="Edu" verified={chainIdentity?.student} />
                                                             </div>
+
+                                                            <button
+                                                                className="mono"
+                                                                onClick={clearIdentity}
+                                                                style={{
+                                                                    marginTop: '1rem',
+                                                                    background: 'transparent',
+                                                                    border: 'none',
+                                                                    color: 'var(--accent-red)',
+                                                                    cursor: 'pointer',
+                                                                    fontSize: '0.6rem',
+                                                                    textDecoration: 'underline'
+                                                                }}
+                                                            >
+                                                                [PURGE_LOCAL_VAULT]
+                                                            </button>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -254,13 +326,30 @@ function App() {
                                         </section>
                                         <section className="col-right">
                                             <div className="glass-card">
-                                                <h2 style={{ marginBottom: '1.5rem' }}>VAULT_ENCRYPTION_STATUS</h2>
-                                                <div className="mono" style={{ fontSize: '0.75rem', lineHeight: '1.8', color: 'var(--text-dim)' }}>
-                                                    ALGORITHM: AES-256-CBC<br />
-                                                    KEY_DERIVATION: ECDSA-SEC-P256K1<br />
-                                                    SALTING: BLAKE2b_64-BIT<br />
-                                                    VAULT_STATUS: {encryptionKey ? 'DECRYPTED' : 'LOCKED'}<br />
-                                                    INTEGRITY: VALID
+                                                <h2 className="view-header" style={{ fontSize: '1rem' }}>VAULT_ENCRYPTION_STATUS</h2>
+                                                <div style={{ marginTop: 'calc(var(--space-unit) * 2)' }}>
+                                                    <div className="profile-field">
+                                                        <span className="profile-label">ALGORITHM</span>
+                                                        <span className="profile-value">AES-256GCM</span>
+                                                    </div>
+                                                    <div className="profile-field">
+                                                        <span className="profile-label">DERIVATION</span>
+                                                        <span className="profile-value">HKDF-SHA256</span>
+                                                    </div>
+                                                    <div className="profile-field">
+                                                        <span className="profile-label">SALTS</span>
+                                                        <span className="profile-value">WEBCRYPTO_256</span>
+                                                    </div>
+                                                    <div className="profile-field">
+                                                        <span className="profile-label">VAULT_STATUS</span>
+                                                        <span className="profile-value" style={{ color: encryptionKey ? 'var(--accent-primary)' : 'var(--accent-secondary)' }}>
+                                                            {encryptionKey ? 'DECRYPTED' : 'LOCKED'}
+                                                        </span>
+                                                    </div>
+                                                    <div className="profile-field">
+                                                        <span className="profile-label">INTEGRITY</span>
+                                                        <span className="profile-value">VALID</span>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </section>
@@ -269,7 +358,8 @@ function App() {
 
                                 {activeTab === 'prover' && (
                                     <div className="glass-card" style={{ height: '100%' }}>
-                                        <h2 style={{ marginBottom: '1.5rem' }}>ATOMIC_PROVING_ENGINE</h2>
+                                        <h2 className="view-header">ATOMIC_PROVING_ENGINE</h2>
+                                        <p className="view-subtitle">ZK_SNARK_GENERATION_SUBSYSTEM</p>
                                         {!isConnected ? (
                                             <div style={{ padding: '4rem 2rem', textAlign: 'center' }}>
                                                 <p style={{ color: 'var(--text-dim)', marginBottom: '1rem' }}>CONNECT WALLET TO ACCESS THE PROOF ENGINE</p>
@@ -282,7 +372,8 @@ function App() {
 
                                 {activeTab === 'analytics' && (
                                     <div className="glass-card">
-                                        <h2 style={{ marginBottom: '1.5rem' }}>ZK_SYSTEM_ANALYTICS</h2>
+                                        <h2 className="view-header">ZK_SYSTEM_ANALYTICS</h2>
+                                        <p className="view-subtitle" style={{ marginBottom: 'calc(var(--space-unit) * 3)' }}>NETWORK_LOAD_AND_IDENTITY_METRICS</p>
                                         <AnalyticsBars />
                                     </div>
                                 )}
@@ -297,6 +388,9 @@ function App() {
                                         />
                                     </div>
                                 )}
+                                {activeTab === 'admin' && (
+                                    <AdminPortal address={address} />
+                                )}
                             </motion.div>
                         </AnimatePresence>
 
@@ -306,7 +400,7 @@ function App() {
                                 <div className="mono">ZK_SPEC: GROTH16_BN128</div>
                                 <button
                                     onClick={() => setView('landing')}
-                                    style={{ background: 'transparent', border: 'none', color: 'var(--accent-mint)', cursor: 'pointer', fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}
+                                    style={{ background: 'transparent', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer', fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}
                                 >
                                     [GATEWAY]
                                 </button>
@@ -320,4 +414,3 @@ function App() {
 }
 
 export default App;
-bitumen

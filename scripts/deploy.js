@@ -28,12 +28,15 @@ async function main() {
     const natAddr = await nat.getAddress();
     const stuAddr = await stu.getAddress();
 
-    // 2. Deploy Registry
-    const registry = await deployContract("IdentityRegistry", [
-        ageAddr,
-        natAddr,
-        stuAddr
-    ]);
+    // 2. Deploy Registry as UUPS Proxy
+    console.log("🛠️ Deploying IdentityRegistry Proxy...");
+    const IdentityRegistry = await hre.ethers.getContractFactory("IdentityRegistry");
+    const registry = await hre.upgrades.deployProxy(
+        IdentityRegistry,
+        [ageAddr, natAddr, stuAddr],
+        { kind: 'uups' }
+    );
+    await registry.waitForDeployment();
     const registryAddr = await registry.getAddress();
 
     const deploymentInfo = {
@@ -83,4 +86,3 @@ main().catch((error) => {
     console.error("❌ Deployment failed:", error);
     process.exit(1);
 });
-bitumen

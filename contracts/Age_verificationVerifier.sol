@@ -43,14 +43,20 @@ contract Age_verificationVerifier {
     uint256 constant deltay2 = 8495653923123431417604973247489272438418190587263600148770280649306958101930;
 
     
-    uint256 constant IC0x = 5124919086765181324403089571858877827163583831766320638614533072549334443403;
-    uint256 constant IC0y = 20052719068530063067912819403290063375209112898955215768323917276097540787237;
+    uint256 constant IC0x = 6055074861330734793385564727610332331153175148832183254853576145130924539088;
+    uint256 constant IC0y = 1314512097195236585728818791450323633812035032954905070724526009492914146715;
     
-    uint256 constant IC1x = 5313129036588061819057205670251794291387226562453909163846837575956178454415;
-    uint256 constant IC1y = 8879391711748619323525082827460855161571612590024890188879118660525736871590;
+    uint256 constant IC1x = 10728821548344013911146681661165842514384497775066553279939338650076574780034;
+    uint256 constant IC1y = 9934306899092664082115750452896238801670901465430864925010708124958449369919;
     
-    uint256 constant IC2x = 15587871566266493737536882834140728520038157518163470335124979601867470816903;
-    uint256 constant IC2y = 12838358348057260441880878441402224658257288120428237780789986098767446426595;
+    uint256 constant IC2x = 21845835013628993289209643220285279074186498437120730635707632546820280278157;
+    uint256 constant IC2y = 8618221463527450613278745244621241937501720183050295188998445202136477072906;
+    
+    uint256 constant IC3x = 6118414879173892690038216910351586835850859256069760404139259190711890333739;
+    uint256 constant IC3y = 14512824897365698117444011577530560463197151441077552190163622115591449655123;
+    
+    uint256 constant IC4x = 21583789799731338604914554769370566352807241312946800314136634797567182401499;
+    uint256 constant IC4y = 7066920718790916801124020727775291361795518516344963967636459940081670735369;
     
  
     // Memory data
@@ -59,7 +65,7 @@ contract Age_verificationVerifier {
 
     uint16 constant pLastMem = 896;
 
-    function verifyProof(uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[2] calldata _pubSignals) public view returns (bool) {
+    function verifyProof(uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[4] calldata _pubSignals) public view returns (bool) {
         assembly {
             function checkField(v) {
                 if iszero(lt(v, r)) {
@@ -106,6 +112,10 @@ contract Age_verificationVerifier {
                 g1_mulAccC(_pVk, IC1x, IC1y, calldataload(add(pubSignals, 0)))
                 
                 g1_mulAccC(_pVk, IC2x, IC2y, calldataload(add(pubSignals, 32)))
+                
+                g1_mulAccC(_pVk, IC3x, IC3y, calldataload(add(pubSignals, 64)))
+                
+                g1_mulAccC(_pVk, IC4x, IC4y, calldataload(add(pubSignals, 96)))
                 
 
                 // -A
@@ -163,6 +173,10 @@ contract Age_verificationVerifier {
             checkField(calldataload(add(_pubSignals, 0)))
             
             checkField(calldataload(add(_pubSignals, 32)))
+            
+            checkField(calldataload(add(_pubSignals, 64)))
+            
+            checkField(calldataload(add(_pubSignals, 96)))
             
 
             // Validate all evaluations

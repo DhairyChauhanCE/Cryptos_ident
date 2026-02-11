@@ -1,6 +1,44 @@
-import CryptoJS from 'crypto-js';
+/**
+ * Identity storage utility (Phase 3 Hardening)
+ * Handles persistent storage of identity data in browser localStorage with AES-256-GCM
+ * Uses native WebCrypto API for hardware-accelerated security.
+ */
 
+const STORAGE_KEY = 'zk_identity_profile';
 let sessionKey = null;
+
+/**
+ * Derive a cryptographic key from a wallet signature using HKDF
+ * @param {string} signature The wallet signature
+ * @returns {Promise<CryptoKey>}
+ */
+const deriveKeyFromSignature = async (signature) => {
+    const encoder = new TextEncoder();
+    const signatureBytes = encoder.encode(signature);
+
+    // Import the raw signature as a key material
+    const baseKey = await crypto.subtle.importKey(
+        'raw',
+        signatureBytes,
+        'HKDF',
+        false,
+        ['deriveKey']
+    );
+
+    // Derive the final AES-GCM key using HKDF
+    return await crypto.subtle.deriveKey(
+        {
+            name: 'HKDF',
+            salt: encoder.encode('extreme-emerald-v1-salt'),
+            info: encoder.encode('identity-vault-key'),
+            hash: 'SHA-256'
+        },
+        baseKey,
+        { name: 'AES-GCM', length: 256 },
+        false,
+        ['encrypt', 'decrypt']
+    );
+};
 
 export const setSessionKey = (key) => {
     sessionKey = key;
@@ -11,89 +49,86 @@ export const getSessionKey = () => {
 };
 
 /**
- * Identity storage utility
- * Handles persistent storage of identity data in browser localStorage with AES-256 encryption
+ * Save user identity to local storage with AES-GCM
+ * @param {Object} data Identity data
+ * @param {string} signature Wallet signature for key derivation
  */
-
-const STORAGE_KEY = 'zk_identity_profile';
-
-/**
- * Save user identity to local storage
- * @param {Object} data Identity data (dob, nationality, salt)
- * @param {string} encryptionKey Key derived from wallet signature
- */
-export const saveIdentity = (data, encryptionKey) => {
-    const key = encryptionKey || sessionKey;
-    if (!key) {
-        throw new Error("Encryption key required for saving identity");
-    }
-
-    const jsonData = JSON.stringify({
+export const saveIdentity = async (data, signature) => {
+    const key = await deriveKeyFromSignature(signature);
+    const encoder = new TextEncoder();
+    const jsonData = encoder.encode(JSON.stringify({
         ...data,
         updatedAt: new Date().toISOString()
-    });
+    }));
 
-    const encryptedData = CryptoJS.AES.encrypt(jsonData, key).toString();
-    localStorage.setItem(STORAGE_KEY, encryptedData);
+    // GCM needs a unique IV (Initialization Vector) per encryption
+    const iv = crypto.getRandomValues(new Uint8Array(12));
 
-    // Auto-cache to session if provided
-    if (encryptionKey) setSessionKey(encryptionKey);
+    const encryptedContent = await crypto.subtle.encrypt(
+        { name: 'AES-GCM', iv },
+        key,
+        jsonData
+    );
+
+    // Store as: IV (12 bytes) + EncryptedData (base64)
+    const combined = new Uint8Array(iv.length + encryptedContent.byteLength);
+    combined.set(iv);
+    combined.set(new Uint8Array(encryptedContent), iv.length);
+
+    const base64Data = btoa(String.fromCharCode(...combined));
+    localStorage.setItem(STORAGE_KEY, base64Data);
+
+    // Cache the key in session
+    setSessionKey(key);
 };
 
 /**
- * Load user identity from local storage
- * @param {string} encryptionKey Key derived from wallet signature
- * @returns {Object|null} Identity data or null if not found/decryption fails
+ * Load and decrypt user identity
+ * @param {string} signature Wallet signature
  */
-export const loadIdentity = (encryptionKey) => {
-    const key = encryptionKey || sessionKey;
-    const encryptedData = localStorage.getItem(STORAGE_KEY);
-    if (!encryptedData || !key) return null;
+export const loadIdentity = async (signature) => {
+    const base64Data = localStorage.getItem(STORAGE_KEY);
+    if (!base64Data || !signature) return null;
 
     try {
-        const bytes = CryptoJS.AES.decrypt(encryptedData, key);
-        const decryptedData = bytes.toString(CryptoJS.enc.Utf8);
-        if (!decryptedData) {
-            console.warn("Decryption returned empty string. Key might be incorrect.");
-            return null;
-        }
-        return JSON.parse(decryptedData);
+        const key = await deriveKeyFromSignature(signature);
+        const combined = new Uint8Array(atob(base64Data).split('').map(c => c.charCodeAt(0)));
+
+        const iv = combined.slice(0, 12);
+        const data = combined.slice(12);
+
+        const decryptedContent = await crypto.subtle.decrypt(
+            { name: 'AES-GCM', iv },
+            key,
+            data
+        );
+
+        const decoder = new TextDecoder();
+        return JSON.parse(decoder.decode(decryptedContent));
     } catch (e) {
-        console.error("Decryption failed", e);
+        console.error("VAULT_DECRYPTION_FAILED", e);
         return null;
     }
 };
 
-/**
- * Check if an identity exists in storage (without decrypting)
- * @returns {boolean}
- */
 export const hasStoredIdentity = () => {
     return localStorage.getItem(STORAGE_KEY) !== null;
 };
 
-/**
- * Clear stored identity data
- */
 export const clearIdentity = () => {
     localStorage.removeItem(STORAGE_KEY);
 };
 
 /**
- * Generate a cryptographically secure salt for identity privacy
- * @returns {string} Random salt
+ * Generate a cryptographically secure 256-bit salt for identity privacy
  */
 export const generateSalt = () => {
-    return Array.from(crypto.getRandomValues(new Uint8Array(16)))
+    const salt = crypto.getRandomValues(new Uint8Array(32)); // 256-bit
+    return Array.from(salt)
         .map(b => b.toString(16).padStart(2, '0'))
         .join('');
 };
 
-/**
- * Generate DID from wallet address
- * @param {string} address Wallet address
- * @returns {string} DID string
- */
 export const generateDID = (address) => {
     return `did:ethr:${address.toLowerCase()}`;
 };

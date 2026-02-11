@@ -11,7 +11,9 @@ export function useWallet() {
         address: null,
         isConnected: false,
         chainId: null,
-        error: null
+        error: null,
+        isConnecting: false,
+        isLoading: false
     });
 
     const connect = async () => {
@@ -20,6 +22,8 @@ export function useWallet() {
             return;
         }
 
+        setWallet(prev => ({ ...prev, isConnecting: true, error: null }));
+        
         try {
             const provider = new ethers.BrowserProvider(window.ethereum);
             const accounts = await provider.send("eth_requestAccounts", []);
@@ -29,10 +33,11 @@ export function useWallet() {
                 address: accounts[0],
                 isConnected: true,
                 chainId: network.chainId.toString(),
-                error: null
+                error: null,
+                isConnecting: false
             });
         } catch (err) {
-            setWallet(prev => ({ ...prev, error: err.message }));
+            setWallet(prev => ({ ...prev, error: err.message, isConnecting: false }));
         }
     };
 
@@ -41,7 +46,8 @@ export function useWallet() {
             address: null,
             isConnected: false,
             chainId: null,
-            error: null
+            error: null,
+            isConnecting: false
         });
     };
 

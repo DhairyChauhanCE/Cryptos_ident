@@ -79,4 +79,3 @@ export function useIdentity(address) {
 
     return { ...status, refresh: refreshStatus };
 }
-bitumen
